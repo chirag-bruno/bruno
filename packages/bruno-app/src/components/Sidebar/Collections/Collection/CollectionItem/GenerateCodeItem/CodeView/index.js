@@ -10,7 +10,6 @@ import { findCollectionByItemUid, getGlobalEnvironmentVariables } from 'utils/co
 import { cloneDeep } from 'lodash';
 import { useMemo } from 'react';
 import { generateSnippet } from '../utils/snippet-generator';
-
 const CodeView = ({ language, item }) => {
   const { displayedTheme } = useTheme();
   const preferences = useSelector((state) => state.app.preferences);
@@ -32,33 +31,14 @@ const CodeView = ({ language, item }) => {
     return c;
   }, [collectionOriginal, globalEnvironments, activeGlobalEnvironmentUid]);
 
-  // add selected global env variables to the collection object
-  const globalEnvironmentVariables = getGlobalEnvironmentVariables({ globalEnvironments, activeGlobalEnvironmentUid });
-  collection.globalEnvironmentVariables = globalEnvironmentVariables;
-
-  const collectionRootAuth = collection?.root?.request?.auth;
-  const requestAuth = item.draft ? get(item, 'draft.request.auth') : get(item, 'request.auth');
-
-  const headers = [
-    ...getAuthHeaders(collectionRootAuth, requestAuth),
-    ...(collection?.root?.request?.headers || []),
-    ...(requestHeaders || [])
-  ];
-
-  let snippet = '';
-  try {
-    const request = cloneDeep(item.request);
-    if (request.url) {
-      request.url = decodeURIComponent(request.url);
-    }
-    snippet = new HTTPSnippet(buildHarRequest({ request: request, headers, type: item.type })).convert(
-      target,
-      client
-    );
-  } catch (e) {
-    console.error(e);
-    snippet = 'Error generating code snippet';
-  }
+  const snippet = useMemo(() => {
+    return generateSnippet({
+      language,
+      item,
+      collection,
+      shouldInterpolate: generateCodePrefs.shouldInterpolate
+    });
+  }, [language, item, collection, generateCodePrefs.shouldInterpolate]);
 
   return (
     <StyledWrapper>
