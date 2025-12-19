@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { requestUrlChanged, updateRequestMethod, updateRequestProtoPath } from 'providers/ReduxStore/slices/collections';
-import { saveRequest, generateGrpcurlCommand } from 'providers/ReduxStore/slices/collections/actions';
+import { saveRequest, generateGrpcurlCommand, saveScratchpadRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
 import { useTheme } from 'providers/Theme';
 import SingleLineEditor from 'components/SingleLineEditor/index';
 import { isMacOS } from 'utils/common/platform';
+import { isScratchpadCollection } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
+import SaveScratchpadRequestModal from 'components/SaveScratchpadRequestModal';
 import {
   IconX,
   IconCheck,
@@ -41,6 +43,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const editorRef = useRef(null);
   const isConnectionActive = useSelector((state) => state.collections.activeConnections.includes(item.uid));
 
+  const isScratchpad = isScratchpadCollection(collection);
   const [grpcMethods, setGrpcMethods] = useState([]);
   const [selectedGrpcMethod, setSelectedGrpcMethod] = useState({
     path: method,
@@ -51,6 +54,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const [showGrpcurlModal, setShowGrpcurlModal] = useState(false);
   const [grpcurlCommand, setGrpcurlCommand] = useState('');
   const [showProtoDropdown, setShowProtoDropdown] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   const methodDropdownRef = useRef(null);
   const protoDropdownRef = useRef(null);
@@ -85,8 +89,37 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const isClientStreamingMethod = selectedGrpcMethod && selectedGrpcMethod.type && CLIENT_STREAMING_METHOD_TYPES.includes(selectedGrpcMethod.type);
 
   const onSave = () => {
-    dispatch(saveRequest(item.uid, collection.uid));
+    if (isScratchpad) {
+      setShowSaveModal(true);
+    } else {
+      dispatch(saveRequest(item.uid, collection.uid));
+    }
   };
+
+  const handleSaveModalSave = useCallback(({ targetCollectionUid, targetFolderUid, requestName }) => {
+    dispatch(saveScratchpadRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
+      .then(() => {
+        setShowSaveModal(false);
+      })
+      .catch((err) => {
+        console.error('Failed to save scratchpad request:', err);
+      });
+  }, [dispatch, item.uid]);
+
+  // Listen for global save modal trigger event (from hotkey handler)
+  useEffect(() => {
+    const handleShowSaveModal = (event) => {
+      // Only show modal if this event is for the current item
+      if (event.detail && event.detail.itemUid === item.uid && isScratchpad) {
+        setShowSaveModal(true);
+      }
+    };
+
+    window.addEventListener('bruno:show-save-modal', handleShowSaveModal);
+    return () => {
+      window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
+    };
+  }, [item.uid, isScratchpad]);
 
   const onUrlChange = (value) => {
     if (!editorRef.current?.editor) return;
@@ -427,6 +460,14 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
       </div>
       {isConnectionActive && isStreamingMethod && (
         <div className="connection-status-strip"></div>
+      )}
+
+      {showSaveModal && (
+        <SaveScratchpadRequestModal
+          onClose={() => setShowSaveModal(false)}
+          onSave={handleSaveModalSave}
+          request={item}
+        />
       )}
 
       {showGrpcurlModal && (

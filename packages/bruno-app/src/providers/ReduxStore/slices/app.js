@@ -50,6 +50,9 @@ const initialState = {
   systemProxyEnvVariables: {},
   clipboard: {
     hasCopiedItems: false // Whether clipboard has Bruno data (for UI)
+  },
+  scratchpad: {
+    lastCreatedRequestType: 'http-request' // Default to HTTP
   }
 };
 
@@ -126,6 +129,9 @@ export const appSlice = createSlice({
     setClipboard: (state, action) => {
       // Update clipboard UI state
       state.clipboard.hasCopiedItems = action.payload.hasCopiedItems;
+    },
+    updateScratchpadLastRequestType: (state, action) => {
+      state.scratchpad.lastCreatedRequestType = action.payload;
     }
   }
 });
@@ -150,7 +156,8 @@ export const {
   updateSystemProxyEnvVariables,
   updateGenerateCode,
   toggleSidebarCollapse,
-  setClipboard
+  setClipboard,
+  updateScratchpadLastRequestType
 } = appSlice.actions;
 
 export const savePreferences = (preferences) => (dispatch, getState) => {

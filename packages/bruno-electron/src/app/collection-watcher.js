@@ -7,8 +7,12 @@ const {
   isWSLPath,
   normalizeAndResolvePath,
   sizeInMB,
-  getCollectionFormat
+  getCollectionFormat,
+  isVirtualPath
 } = require('../utils/filesystem');
+const {
+  readFileSync: vfsReadFileSync
+} = require('../utils/virtual-fs');
 const {
   parseEnvironment,
   parseRequest,
@@ -261,7 +265,7 @@ const add = async (win, pathname, collectionUid, collectionPath, useWorkerThread
     };
 
     try {
-      let content = fs.readFileSync(pathname, 'utf8');
+      let content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
       let parsed = await parseCollection(content, { format });
 
       let collectionRoot, brunoConfig;
@@ -335,8 +339,9 @@ const add = async (win, pathname, collectionUid, collectionPath, useWorkerThread
       }
     };
 
-    const fileStats = fs.statSync(pathname);
-    let content = fs.readFileSync(pathname, 'utf8');
+    const { statSync: vfsStatSync } = require('../utils/virtual-fs');
+    const fileStats = isVirtualPath(pathname) ? vfsStatSync(pathname) : fs.statSync(pathname);
+    let content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
 
     // If worker thread is not used, we can directly parse the file
     if (!useWorkerThread) {
@@ -449,7 +454,7 @@ const addDirectory = async (win, pathname, collectionUid, collectionPath) => {
 const change = async (win, pathname, collectionUid, collectionPath) => {
   if (isBrunoConfigFile(pathname, collectionPath)) {
     try {
-      const content = fs.readFileSync(pathname, 'utf8');
+      const content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
       let brunoConfig = JSON.parse(content);
 
       // Transform the config to add file existence checks for protobuf files and import paths
@@ -505,7 +510,7 @@ const change = async (win, pathname, collectionUid, collectionPath) => {
     };
 
     try {
-      let content = fs.readFileSync(pathname, 'utf8');
+      let content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
       let format = getCollectionFormat(collectionPath);
       let parsed = await parseCollection(content, { format });
 
@@ -556,7 +561,7 @@ const change = async (win, pathname, collectionUid, collectionPath) => {
 
     try {
       let format = getCollectionFormat(collectionPath);
-      let content = fs.readFileSync(pathname, 'utf8');
+      let content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
       file.data = await parseFolder(content, { format });
 
       hydrateCollectionRootWithUuid(file.data);
@@ -579,8 +584,9 @@ const change = async (win, pathname, collectionUid, collectionPath) => {
         }
       };
 
-      const content = fs.readFileSync(pathname, 'utf8');
-      const fileStats = fs.statSync(pathname);
+      const { statSync: vfsStatSync } = require('../utils/virtual-fs');
+      const content = isVirtualPath(pathname) ? vfsReadFileSync(pathname, 'utf8') : fs.readFileSync(pathname, 'utf8');
+      const fileStats = isVirtualPath(pathname) ? vfsStatSync(pathname) : fs.statSync(pathname);
 
       if (fileStats.size >= MAX_FILE_SIZE && format === 'bru') {
         file.data = await parseLargeRequestWithRedaction(content);
@@ -863,5 +869,9 @@ class CollectionWatcher {
 }
 
 const collectionWatcher = new CollectionWatcher();
+
+collectionWatcher.addFile = async (win, pathname, collectionUid, collectionPath, useWorkerThread = false) => {
+  return add(win, pathname, collectionUid, collectionPath, useWorkerThread, collectionWatcher);
+};
 
 module.exports = collectionWatcher;

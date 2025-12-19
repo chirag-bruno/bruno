@@ -213,6 +213,11 @@ const generateUniqueName = (baseName, checkExists) => {
 };
 
 const getCollectionFormat = (collectionPath) => {
+  // Virtual paths (scratchpad) always use 'bru' format
+  if (isVirtualPath(collectionPath)) {
+    return 'bru';
+  }
+
   const ocYmlPath = path.join(collectionPath, 'opencollection.yml');
   if (fs.existsSync(ocYmlPath)) {
     return 'yml';
@@ -232,6 +237,7 @@ const validateName = (name) => {
   const firstCharacter = /^[^\s\-<>:"/\\|?*\x00-\x1F]/; // no space, hyphen and `invalidCharacters`
   const middleCharacters = /^[^<>:"/\\|?*\x00-\x1F]*$/; // no `invalidCharacters`
   const lastCharacter = /[^.\s<>:"/\\|?*\x00-\x1F]$/; // no dot, space and `invalidCharacters`
+  if (!name || typeof name !== 'string') return false; // name must be a non-empty string
   if (name.length > 255) return false; // max name length
 
   if (reservedDeviceNames.test(name)) return false; // windows reserved names
@@ -446,6 +452,18 @@ const isCollectionRootBruFile = (pathname, collectionPath) => {
   return dirname === collectionPath && basename === 'collection.bru';
 };
 
+/**
+ * Check if a pathname is a virtual (scratchpad) path
+ * @param {string} pathname - The pathname to check
+ * @returns {boolean} - True if the path is virtual
+ */
+const isVirtualPath = (pathname) => {
+  if (!pathname || typeof pathname !== 'string') {
+    return false;
+  }
+  return pathname.startsWith('/scratchpad/');
+};
+
 module.exports = {
   isValidPathname,
   exists,
@@ -483,5 +501,6 @@ module.exports = {
   isDotEnvFile,
   isBrunoConfigFile,
   isBruEnvironmentConfig,
-  isCollectionRootBruFile
+  isCollectionRootBruFile,
+  isVirtualPath
 };

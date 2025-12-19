@@ -47,8 +47,19 @@ const {
   isDotEnvFile,
   isBrunoConfigFile,
   isBruEnvironmentConfig,
-  isCollectionRootBruFile
+  isCollectionRootBruFile,
+  isVirtualPath
 } = require('../utils/filesystem');
+const {
+  readFileSync: vfsReadFileSync,
+  writeFileSync: vfsWriteFileSync,
+  existsSync: vfsExistsSync,
+  readdirSync: vfsReaddirSync,
+  statSync: vfsStatSync,
+  unlinkSync: vfsUnlinkSync,
+  rmdirSync: vfsRmdirSync,
+  getCollectionUidFromPath
+} = require('../utils/virtual-fs');
 const { openCollectionDialog, openCollectionsByPathname } = require('../app/collections');
 const { generateUidBasedOnHash, stringifyJson, safeStringifyJSON, safeParseJSON } = require('../utils/common');
 const { moveRequestUid, deleteRequestUid } = require('../cache/requestUids');
@@ -82,6 +93,10 @@ const envHasSecrets = (environment = {}) => {
 };
 
 const findCollectionPathByItemPath = (filePath) => {
+  if (isVirtualPath(filePath)) {
+    return '/scratchpad/root';
+  }
+
   const allCollectionPaths = collectionWatcher.getAllWatcherPaths();
 
   // Find the collection path that contains this file
@@ -98,6 +113,10 @@ const findCollectionPathByItemPath = (filePath) => {
 };
 
 const validatePathIsInsideCollection = (filePath) => {
+  if (isVirtualPath(filePath)) {
+    return;
+  }
+
   const collectionPath = findCollectionPathByItemPath(filePath);
 
   if (!collectionPath) {
@@ -295,7 +314,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       }
 
       const content = await stringifyFolder(folderRoot, { format });
-      await writeFile(folderFilePath, content);
+      vfsWriteFileSync(folderFilePath, content, 'utf8');
     } catch (error) {
       return Promise.reject(error);
     }
@@ -308,7 +327,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       const filename = format === 'yml' ? 'opencollection.yml' : 'collection.bru';
       const content = await stringifyCollection(collectionRoot, brunoConfig, { format });
 
-      await writeFile(path.join(collectionPathname, filename), content);
+      vfsWriteFileSync(path.join(collectionPathname, filename), content, 'utf8');
     } catch (error) {
       console.error('Error in save-collection-root:', error);
       return Promise.reject(error);
@@ -318,7 +337,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   // new request
   ipcMain.handle('renderer:new-request', async (event, pathname, request) => {
     try {
-      if (fs.existsSync(pathname)) {
+      if (vfsExistsSync(pathname)) {
         throw new Error(`path: ${pathname} already exists`);
       }
 
@@ -329,14 +348,22 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       const format = getCollectionFormat(collectionPath);
 
       // For the actual filename part, we want to be strict
-      const baseFilename = request?.filename?.replace(`.${format}`, '');
-      if (!validateName(baseFilename)) {
-        throw new Error(`${request.filename} is not a valid filename`);
+      // Extract filename from pathname if request.filename is not available
+      const filename = request?.filename || path.basename(pathname);
+      const baseFilename = filename.replace(`.${format}`, '');
+      if (!baseFilename || !validateName(baseFilename)) {
+        throw new Error(`${filename} is not a valid filename`);
       }
       validatePathIsInsideCollection(pathname);
 
       const content = await stringifyRequestViaWorker(request, { format });
-      await writeFile(pathname, content);
+      vfsWriteFileSync(pathname, content, 'utf8');
+
+      if (isVirtualPath(pathname)) {
+        const collectionUid = getCollectionUidFromPath(pathname) || 'scratchpad';
+        const useWorkerThread = false;
+        await collectionWatcher.addFile(mainWindow, pathname, collectionUid, collectionPath, useWorkerThread);
+      }
     } catch (error) {
       return Promise.reject(error);
     }
@@ -345,12 +372,12 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   // save request
   ipcMain.handle('renderer:save-request', async (event, pathname, request, format) => {
     try {
-      if (!fs.existsSync(pathname)) {
+      if (!vfsExistsSync(pathname)) {
         throw new Error(`path: ${pathname} does not exist`);
       }
 
       const content = await stringifyRequestViaWorker(request, { format });
-      await writeFile(pathname, content);
+      vfsWriteFileSync(pathname, content, 'utf8');
     } catch (error) {
       return Promise.reject(error);
     }
@@ -363,12 +390,12 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
         const request = r.item;
         const pathname = r.pathname;
 
-        if (!fs.existsSync(pathname)) {
+        if (!vfsExistsSync(pathname)) {
           throw new Error(`path: ${pathname} does not exist`);
         }
 
         const content = await stringifyRequestViaWorker(request, { format: r.format });
-        await writeFile(pathname, content);
+        vfsWriteFileSync(pathname, content, 'utf8');
       }
     } catch (error) {
       return Promise.reject(error);
@@ -418,12 +445,12 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   // update variable in request/folder/collection file
   ipcMain.handle('renderer:update-variable-in-file', async (event, pathname, variable, scopeType, collectionRoot, format) => {
     try {
-      if (!fs.existsSync(pathname)) {
+      if (!vfsExistsSync(pathname)) {
         throw new Error(`path: ${pathname} does not exist`);
       }
 
       // Read and parse the file
-      const fileContent = fs.readFileSync(pathname, 'utf8');
+      const fileContent = vfsReadFileSync(pathname, 'utf8');
       const parsedData = await parseFileByType(fileContent, scopeType);
 
       // Update the specific variable or create it if it doesn't exist
@@ -434,7 +461,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       _.set(parsedData, varsPath, updatedVariables);
 
       const content = await stringifyByType(parsedData, scopeType, collectionRoot, format);
-      await writeFile(pathname, content);
+      vfsWriteFileSync(pathname, content, 'utf8');
     } catch (error) {
       return Promise.reject(error);
     }
@@ -622,7 +649,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   // rename item
   ipcMain.handle('renderer:rename-item-name', async (event, { itemPath, newName, collectionPathname }) => {
     try {
-      if (!fs.existsSync(itemPath)) {
+      if (!vfsExistsSync(itemPath)) {
         throw new Error(`path: ${itemPath} does not exist`);
       }
 
@@ -630,8 +657,8 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
         const format = getCollectionFormat(collectionPathname);
         const folderFilePath = path.join(itemPath, `folder.${format}`);
         let folderFileJsonContent;
-        if (fs.existsSync(folderFilePath)) {
-          const oldFolderFileContent = await fs.promises.readFile(folderFilePath, 'utf8');
+        if (vfsExistsSync(folderFilePath)) {
+          const oldFolderFileContent = vfsReadFileSync(folderFilePath, 'utf8');
           folderFileJsonContent = await parseFolder(oldFolderFileContent, { format });
           folderFileJsonContent.meta.name = newName;
         } else {
@@ -643,7 +670,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
         }
 
         const folderFileContent = await stringifyFolder(folderFileJsonContent, { format });
-        await writeFile(folderFilePath, folderFileContent);
+        vfsWriteFileSync(folderFilePath, folderFileContent, 'utf8');
 
         return;
       }
@@ -653,11 +680,11 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
         throw new Error(`path: ${itemPath} is not a valid request file`);
       }
 
-      const data = fs.readFileSync(itemPath, 'utf8');
+      const data = vfsReadFileSync(itemPath, 'utf8');
       const jsonData = parseRequest(data, { format });
       jsonData.name = newName;
       const content = stringifyRequest(jsonData, { format });
-      await writeFile(itemPath, content);
+      vfsWriteFileSync(itemPath, content, 'utf8');
     } catch (error) {
       return Promise.reject(error);
     }
@@ -784,7 +811,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   ipcMain.handle('renderer:delete-item', async (event, pathname, type, collectionPathname) => {
     try {
       if (type === 'folder') {
-        if (!fs.existsSync(pathname)) {
+        if (!vfsExistsSync(pathname)) {
           return Promise.reject(new Error('The directory does not exist'));
         }
 
@@ -794,15 +821,32 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
           deleteRequestUid(requestFile);
         }
 
-        fs.rmSync(pathname, { recursive: true, force: true });
+        if (isVirtualPath(pathname)) {
+          const deleteRecursive = (dirPath) => {
+            const entries = vfsReaddirSync(dirPath, { withFileTypes: true });
+            for (const entry of entries) {
+              const fullPath = path.join(dirPath, entry.name);
+              if (entry.isDirectory()) {
+                deleteRecursive(fullPath);
+                vfsRmdirSync(fullPath);
+              } else {
+                vfsUnlinkSync(fullPath);
+              }
+            }
+          };
+          deleteRecursive(pathname);
+          vfsRmdirSync(pathname);
+        } else {
+          fs.rmSync(pathname, { recursive: true, force: true });
+        }
       } else if (['http-request', 'graphql-request', 'grpc-request', 'ws-request'].includes(type)) {
-        if (!fs.existsSync(pathname)) {
+        if (!vfsExistsSync(pathname)) {
           return Promise.reject(new Error('The file does not exist'));
         }
 
         deleteRequestUid(pathname);
 
-        fs.unlinkSync(pathname);
+        vfsUnlinkSync(pathname);
       } else {
         return Promise.reject();
       }
@@ -1375,7 +1419,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   ipcMain.handle('renderer:load-request-via-worker', async (event, { collectionUid, pathname }) => {
     let fileStats;
     try {
-      fileStats = fs.statSync(pathname);
+      fileStats = vfsStatSync(pathname);
       if (hasBruExtension(pathname)) {
         const file = {
           meta: {
@@ -1384,7 +1428,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
             name: path.basename(pathname)
           }
         };
-        let bruContent = fs.readFileSync(pathname, 'utf8');
+        let bruContent = vfsReadFileSync(pathname, 'utf8');
         const metaJson = parseBruFileMeta(bruContent);
         file.data = metaJson;
         file.loading = true;
@@ -1408,7 +1452,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
             name: path.basename(pathname)
           }
         };
-        let bruContent = fs.readFileSync(pathname, 'utf8');
+        let bruContent = vfsReadFileSync(pathname, 'utf8');
         const metaJson = parseBruFileMeta(bruContent);
         file.data = metaJson;
         file.partial = true;
@@ -1425,7 +1469,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
   ipcMain.handle('renderer:load-request', async (event, { collectionUid, pathname }) => {
     let fileStats;
     try {
-      fileStats = fs.statSync(pathname);
+      fileStats = vfsStatSync(pathname);
       if (hasRequestExtension(pathname)) {
         const file = {
           meta: {
@@ -1434,7 +1478,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
             name: path.basename(pathname)
           }
         };
-        let bruContent = fs.readFileSync(pathname, 'utf8');
+        let bruContent = vfsReadFileSync(pathname, 'utf8');
         const metaJson = parseBruFileMeta(bruContent);
         file.data = metaJson;
         file.loading = true;
@@ -1458,7 +1502,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
             name: path.basename(pathname)
           }
         };
-        let bruContent = fs.readFileSync(pathname, 'utf8');
+        let bruContent = vfsReadFileSync(pathname, 'utf8');
         const metaJson = parseBruFileMeta(bruContent);
         file.data = metaJson;
         file.partial = true;

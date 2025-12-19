@@ -32,7 +32,7 @@ import NewFolder from 'components/Sidebar/NewFolder';
 import CollectionItem from './CollectionItem';
 import RemoveCollection from './RemoveCollection';
 import { doesCollectionHaveItemsMatchingSearchText } from 'utils/collections/search';
-import { isItemAFolder, isItemARequest } from 'utils/collections';
+import { isItemAFolder, isItemARequest, isScratchpadCollection } from 'utils/collections';
 import { isTabForItemActive } from 'src/selectors/tab';
 
 import RenameCollection from './RenameCollection';
@@ -261,11 +261,14 @@ const Collection = ({ collection, searchText }) => {
     }
   }
 
+  const isScratchpad = isScratchpadCollection(collection);
+
   const collectionRowClassName = classnames('flex py-1 collection-name items-center', {
     'item-hovered': isOver && dropType === 'adjacent', // For collection-to-collection moves (show line)
     'drop-target': isOver && dropType === 'inside', // For collection-item drops (highlight full area)
     'collection-focused-in-tab': isCollectionFocused && !isKeyboardFocused,
-    'collection-keyboard-focused': isKeyboardFocused
+    'collection-keyboard-focused': isKeyboardFocused,
+    'scratchpad-collection': isScratchpad
   });
 
   // we need to sort request items by seq property
@@ -286,33 +289,37 @@ const Collection = ({ collection, searchText }) => {
         setShowNewRequestModal(true);
       }
     },
-    {
-      id: 'new-folder',
-      leftSection: IconFolderPlus,
-      label: 'New Folder',
-      onClick: () => {
-        ensureCollectionIsMounted();
-        setShowNewFolderModal(true);
-      }
-    },
-    {
-      id: 'run',
-      leftSection: IconPlayerPlay,
-      label: 'Run',
-      onClick: () => {
-        ensureCollectionIsMounted();
-        handleRun();
-      }
-    },
-    {
-      id: 'clone',
-      leftSection: IconCopy,
-      label: 'Clone',
-      testId: 'clone-collection',
-      onClick: () => {
-        setShowCloneCollectionModalOpen(true);
-      }
-    },
+    ...(isScratchpad
+      ? []
+      : [
+          {
+            id: 'new-folder',
+            leftSection: IconFolderPlus,
+            label: 'New Folder',
+            onClick: () => {
+              ensureCollectionIsMounted();
+              setShowNewFolderModal(true);
+            }
+          },
+          {
+            id: 'run',
+            leftSection: IconPlayerPlay,
+            label: 'Run',
+            onClick: () => {
+              ensureCollectionIsMounted();
+              handleRun();
+            }
+          },
+          {
+            id: 'clone',
+            leftSection: IconCopy,
+            label: 'Clone',
+            testId: 'clone-collection',
+            onClick: () => {
+              setShowCloneCollectionModalOpen(true);
+            }
+          }
+        ]),
     ...(hasCopiedItems
       ? [
           {
@@ -331,60 +338,64 @@ const Collection = ({ collection, searchText }) => {
         setShowRenameCollectionModal(true);
       }
     },
-    {
-      id: 'share',
-      leftSection: IconShare,
-      label: 'Share',
-      onClick: () => {
-        ensureCollectionIsMounted();
-        setShowShareCollectionModal(true);
-      }
-    },
-    {
-      id: 'collapse',
-      leftSection: IconFoldDown,
-      label: 'Collapse',
-      onClick: handleCollapseFullCollection
-    },
-    {
-      id: 'show-in-folder',
-      leftSection: IconFolder,
-      label: 'Show in File Explorer',
-      onClick: handleShowInFolder
-    },
-    {
-      id: 'divider-1',
-      type: 'divider'
-    },
-    {
-      id: 'settings',
-      leftSection: IconSettings,
-      label: 'Settings',
-      onClick: viewCollectionSettings
-    },
-    {
-      id: 'terminal',
-      leftSection: IconTerminal2,
-      label: 'Open in Terminal',
-      onClick: async () => {
-        const collectionCwd = collection.pathname;
-        await openDevtoolsAndSwitchToTerminal(dispatch, collectionCwd);
-      }
-    },
-    {
-      id: 'remove',
-      leftSection: IconX,
-      label: 'Remove',
-      onClick: () => {
-        setShowRemoveCollectionModal(true);
-      }
-    }
+    ...(isScratchpad
+      ? []
+      : [
+          {
+            id: 'share',
+            leftSection: IconShare,
+            label: 'Share',
+            onClick: () => {
+              ensureCollectionIsMounted();
+              setShowShareCollectionModal(true);
+            }
+          },
+          {
+            id: 'collapse',
+            leftSection: IconFoldDown,
+            label: 'Collapse',
+            onClick: handleCollapseFullCollection
+          },
+          {
+            id: 'show-in-folder',
+            leftSection: IconFolder,
+            label: 'Show in File Explorer',
+            onClick: handleShowInFolder
+          },
+          {
+            id: 'divider-1',
+            type: 'divider'
+          },
+          {
+            id: 'settings',
+            leftSection: IconSettings,
+            label: 'Settings',
+            onClick: viewCollectionSettings
+          },
+          {
+            id: 'terminal',
+            leftSection: IconTerminal2,
+            label: 'Open in Terminal',
+            onClick: async () => {
+              const collectionCwd = collection.pathname;
+              await openDevtoolsAndSwitchToTerminal(dispatch, collectionCwd);
+            }
+          },
+          {
+            id: 'remove',
+            leftSection: IconX,
+            label: 'Remove',
+            onClick: () => {
+              setShowRemoveCollectionModal(true);
+            }
+          }
+        ])
   ];
 
   return (
     <StyledWrapper className="flex flex-col" id={`collection-${collection.name.replace(/\s+/g, '-').toLowerCase()}`}>
       {showNewRequestModal && <NewRequest collectionUid={collection.uid} onClose={() => setShowNewRequestModal(false)} />}
-      {showNewFolderModal && <NewFolder collectionUid={collection.uid} onClose={() => setShowNewFolderModal(false)} />}
+      {showNewFolderModal && !isScratchpad && <NewFolder collectionUid={collection.uid} onClose={() => setShowNewFolderModal(false)} />}
       {showRenameCollectionModal && (
         <RenameCollection collectionUid={collection.uid} onClose={() => setShowRenameCollectionModal(false)} />
       )}

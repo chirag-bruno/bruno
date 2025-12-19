@@ -20,7 +20,8 @@ import {
   isItemARequest,
   getAllVariables,
   transformRequestToSaveToFilesystem,
-  transformCollectionRootToSave
+  transformCollectionRootToSave,
+  isScratchpadCollection
 } from 'utils/collections';
 import { uuid, waitForNextTick } from 'utils/common';
 import { cancelNetworkRequest, connectWS, sendGrpcRequest, sendNetworkRequest, sendWsRequest } from 'utils/network/index';
@@ -54,7 +55,10 @@ import {
   addFolderVar,
   updateFolderVar,
   addCollectionVar,
-  updateCollectionVar
+  updateCollectionVar,
+  newItem,
+  newEphemeralHttpRequest,
+  removeScratchpadRequests
 } from './index';
 
 import { each } from 'lodash';
@@ -141,6 +145,13 @@ export const saveRequest = (itemUid, collectionUid, silent = false) => (dispatch
       return reject(new Error('Collection not found'));
     }
 
+    // For scratchpad requests, we need to show the picker or use saved location
+    // This is handled by the component that calls saveRequest
+    // We'll return a special indicator that the component should handle
+    if (isScratchpadCollection(collection)) {
+      return reject(new Error('SCRATCHPAD_SAVE_REQUIRED'));
+    }
+
     const collectionCopy = cloneDeep(collection);
     const item = findItemInCollection(collectionCopy, itemUid);
     if (!item) {
@@ -200,6 +211,214 @@ export const saveMultipleRequests = (items) => (dispatch, getState) => {
       .then(resolve)
       .catch((err) => {
         toast.error('Failed to save requests!');
+        reject(err);
+      });
+  });
+};
+
+export const saveScratchpadRequestToLocation = (requestUid, targetCollectionUid, targetFolderUid, requestName) => (dispatch, getState) => {
+  return new Promise((resolve, reject) => {
+    const state = getState();
+    const scratchpad = findCollectionByUid(state.collections.collections, 'scratchpad');
+    const targetCollection = findCollectionByUid(state.collections.collections, targetCollectionUid);
+
+    if (!scratchpad) {
+      return reject(new Error('Scratchpad collection not found'));
+    }
+
+    if (!targetCollection) {
+      return reject(new Error('Target collection not found'));
+    }
+
+    if (isScratchpadCollection(targetCollection)) {
+      return reject(new Error('Cannot save to scratchpad'));
+    }
+
+    const request = findItemInCollection(scratchpad, requestUid);
+    if (!request || !isItemARequest(request)) {
+      return reject(new Error('Request not found in scratchpad'));
+    }
+
+    // Get request data (use draft if exists)
+    const requestData = request.draft ? cloneDeep(request.draft) : cloneDeep(request);
+    delete requestData.draft;
+
+    // Validate request name uniqueness
+    const parentItem = targetFolderUid
+      ? findItemInCollection(targetCollection, targetFolderUid)
+      : targetCollection;
+
+    if (!parentItem) {
+      return reject(new Error('Target location not found'));
+    }
+
+    const resolvedFilename = resolveRequestFilename(requestName, targetCollection.format);
+    const existingItems = parentItem.items || [];
+    const requestExtensions = /\.(bru|yml|yaml)$/i;
+    const filenameWithoutExt = resolvedFilename.replace(requestExtensions, '');
+
+    const duplicateExists = existingItems.some((item) => {
+      if (item.type === 'folder') return false;
+      const itemFilename = item.filename || '';
+      const itemFilenameWithoutExt = itemFilename.replace(requestExtensions, '');
+      return itemFilenameWithoutExt === filenameWithoutExt;
+    });
+
+    if (duplicateExists) {
+      return reject(new Error('A request with this name already exists in the selected location'));
+    }
+
+    // Prepare item to save
+    requestData.name = requestName;
+    requestData.filename = resolvedFilename;
+    const itemToSave = transformRequestToSaveToFilesystem(requestData);
+
+    // Add filename to the transformed object since transformRequestToSaveToFilesystem doesn't preserve it
+    itemToSave.filename = resolvedFilename;
+
+    const itemIsValid = itemSchema.validateSync(itemToSave);
+    if (!itemIsValid) {
+      return reject(new Error('Invalid request data'));
+    }
+
+    // Calculate full pathname
+    const fullPathname = targetFolderUid
+      ? path.join(parentItem.pathname, resolvedFilename)
+      : path.join(targetCollection.pathname, resolvedFilename);
+
+    // Calculate sequence number
+    const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
+    itemToSave.seq = items.length + 1;
+
+    const { ipcRenderer } = window;
+
+    // Get the original request pathname from scratchpad to delete it later
+    const scratchpadRequestPathname = request.pathname;
+
+    ipcRenderer
+      .invoke('renderer:new-request', fullPathname, itemToSave)
+      .then(() => {
+        // Delete the request from virtual filesystem if it exists
+        // Check if it's a virtual path (scratchpad path starts with /scratchpad/)
+        if (scratchpadRequestPathname && scratchpadRequestPathname.startsWith('/scratchpad/')) {
+          return ipcRenderer
+            .invoke('renderer:delete-item', scratchpadRequestPathname, request.type, scratchpad.pathname)
+            .catch((err) => {
+              // Log error but don't fail the save operation
+              console.error('Failed to delete scratchpad request from virtual filesystem:', err);
+            });
+        }
+      })
+      .then(() => {
+        // Remove from scratchpad
+        dispatch(removeScratchpadRequests({ requestUids: [requestUid] }));
+
+        // Open the request in the target collection
+        dispatch(
+          insertTaskIntoQueue({
+            uid: uuid(),
+            type: 'OPEN_REQUEST',
+            collectionUid: targetCollectionUid,
+            itemPathname: fullPathname
+          })
+        );
+
+        toast.success(`Request saved to ${targetCollection.name}`);
+        resolve();
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to save request!');
+        reject(err);
+      });
+  });
+};
+
+export const saveScratchpadRequestsToCollection = (requestUids, targetCollectionUid) => (dispatch, getState) => {
+  return new Promise((resolve, reject) => {
+    const state = getState();
+    const scratchpad = findCollectionByUid(state.collections.collections, 'scratchpad');
+    const targetCollection = findCollectionByUid(state.collections.collections, targetCollectionUid);
+
+    if (!scratchpad) {
+      return reject(new Error('Scratchpad collection not found'));
+    }
+
+    if (!targetCollection) {
+      return reject(new Error('Target collection not found'));
+    }
+
+    if (isScratchpadCollection(targetCollection)) {
+      return reject(new Error('Cannot save to scratchpad'));
+    }
+
+    const requestsToSave = [];
+    const requestUidsToRemove = [];
+
+    each(requestUids, (requestUid) => {
+      const request = findItemInCollection(scratchpad, requestUid);
+      if (request && isItemARequest(request)) {
+        const requestData = request.draft ? cloneDeep(request.draft) : cloneDeep(request);
+
+        delete requestData.draft;
+
+        const itemToSave = transformRequestToSaveToFilesystem(requestData);
+
+        const itemIsValid = itemSchema.validateSync(itemToSave);
+        if (itemIsValid) {
+          const resolvedFilename = requestData.filename || request.filename;
+          const fullPathname = path.join(targetCollection.pathname, resolvedFilename);
+
+          // Add filename to the transformed object since transformRequestToSaveToFilesystem doesn't preserve it
+          itemToSave.filename = resolvedFilename;
+
+          requestsToSave.push({
+            item: itemToSave,
+            pathname: fullPathname,
+            format: targetCollection.format,
+            requestUid: requestUid,
+            targetCollectionUid: targetCollectionUid,
+            scratchpadPathname: request.pathname, // Store original pathname for deletion
+            requestType: request.type
+          });
+          requestUidsToRemove.push(requestUid);
+        }
+      }
+    });
+
+    if (requestsToSave.length === 0) {
+      return resolve();
+    }
+
+    const { ipcRenderer } = window;
+
+    const savePromises = requestsToSave.map((r) => {
+      return ipcRenderer.invoke('renderer:new-request', r.pathname, r.item);
+    });
+
+    Promise.all(savePromises)
+      .then(() => {
+        // Delete all requests from virtual filesystem
+        const deletePromises = requestsToSave
+          .filter((r) => r.scratchpadPathname && r.scratchpadPathname.startsWith('/scratchpad/'))
+          .map((r) => {
+            return ipcRenderer
+              .invoke('renderer:delete-item', r.scratchpadPathname, r.requestType, scratchpad.pathname)
+              .catch((err) => {
+                // Log error but don't fail the save operation
+                console.error(`Failed to delete scratchpad request ${r.scratchpadPathname} from virtual filesystem:`, err);
+              });
+          });
+
+        return Promise.all(deletePromises);
+      })
+      .then(() => {
+        dispatch(removeScratchpadRequests({ requestUids: requestUidsToRemove }));
+
+        toast.success(`Saved ${requestsToSave.length} request(s) to ${targetCollection.name}`);
+        resolve();
+      })
+      .catch((err) => {
+        toast.error('Failed to save scratchpad requests!');
         reject(err);
       });
   });
@@ -1236,6 +1455,8 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
+    const isScratchpad = isScratchpadCollection(collection);
+
     const parts = splitOnFirst(requestUrl, '?');
     const queryParams = parseQueryParams(parts[1]);
     each(queryParams, (urlParam) => {
@@ -1251,11 +1472,14 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
 
     const params = [...queryParams, ...pathParams];
 
+    const resolvedFilename = resolveRequestFilename(filename, collection.format);
+    const itemUidForPath = itemUid || 'root';
+
     const item = {
       uid: uuid(),
       type: requestType,
       name: requestName,
-      filename,
+      filename: resolvedFilename,
       request: {
         method: requestMethod,
         url: requestUrl,
@@ -1275,6 +1499,10 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
           req: [],
           res: []
         },
+        script: {
+          req: null,
+          res: null
+        },
         assertions: [],
         auth: auth ?? {
           mode: 'inherit'
@@ -1282,11 +1510,16 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
       },
       settings: settings ?? {
         encodeUrl: true
-      }
+      },
+      draft: null
     };
+    item.draft = cloneDeep(item);
+
+    if (isScratchpad && itemUid) {
+      return reject(new Error('Scratchpad does not support folders'));
+    }
 
     // itemUid is null when we are creating a new request at the root level
-    const resolvedFilename = resolveRequestFilename(filename, collection.format);
     if (!itemUid) {
       const reqWithSameNameExists = find(
         collection.items,
@@ -1296,7 +1529,10 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
       item.seq = items.length + 1;
 
       if (!reqWithSameNameExists) {
-        const fullName = path.join(collection.pathname, resolvedFilename);
+        const fullName = isScratchpad
+          ? `/scratchpad/root/${resolvedFilename}`
+          : path.join(collection.pathname, resolvedFilename);
+        item.pathname = fullName;
         const { ipcRenderer } = window;
 
         ipcRenderer
@@ -1328,6 +1564,7 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
         item.seq = items.length + 1;
         if (!reqWithSameNameExists) {
           const fullName = path.join(currentItem.pathname, resolvedFilename);
+          item.pathname = fullName;
           const { ipcRenderer } = window;
           ipcRenderer
             .invoke('renderer:new-request', fullName, item)
@@ -1361,13 +1598,14 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
     if (!collection) {
       return reject(new Error('Collection not found'));
     }
-    // do we need to handle query, path params for grpc requests?
-    // skipping for now
+
+    const isScratchpad = isScratchpadCollection(collection);
+    const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
     const item = {
       uid: uuid(),
       name: requestName,
-      filename,
+      filename: resolvedFilename,
       type: 'grpc-request',
       headers: headers ?? [],
       request: {
@@ -1394,12 +1632,19 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
         },
         assertions: [],
         tests: null
-      }
+      },
+      draft: null
     };
+    item.draft = cloneDeep(item);
 
+    // Scratchpad does not support folders
+    if (isScratchpad && itemUid) {
+      return reject(new Error('Scratchpad does not support folders'));
+    }
+
+    // For regular collections, use file system
     // itemUid is null when we are creating a new request at the root level
     const parentItem = itemUid ? findItemInCollection(collection, itemUid) : collection;
-    const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
     if (!parentItem) {
       return reject(new Error('Parent item not found'));
@@ -1414,7 +1659,10 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
 
     const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
     item.seq = items.length + 1;
-    const fullName = path.join(parentItem.pathname, resolvedFilename);
+    const fullName = isScratchpad && !itemUid
+      ? `/scratchpad/root/${resolvedFilename}`
+      : path.join(parentItem.pathname, resolvedFilename);
+    item.pathname = fullName;
     const { ipcRenderer } = window;
     ipcRenderer
       .invoke('renderer:new-request', fullName, item)
@@ -1442,10 +1690,13 @@ export const newWsRequest = (params) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
+    const isScratchpad = isScratchpadCollection(collection);
+    const resolvedFilename = resolveRequestFilename(filename, collection.format);
+
     const item = {
       uid: uuid(),
       name: requestName,
-      filename,
+      filename: resolvedFilename,
       type: 'ws-request',
       headers: headers ?? [],
       request: {
@@ -1475,12 +1726,19 @@ export const newWsRequest = (params) => (dispatch, getState) => {
         },
         assertions: [],
         tests: null
-      }
+      },
+      draft: null
     };
+    item.draft = cloneDeep(item);
 
+    // Scratchpad does not support folders
+    if (isScratchpad && itemUid) {
+      return reject(new Error('Scratchpad does not support folders'));
+    }
+
+    // For regular collections, use file system
     // itemUid is null when we are creating a new request at the root level
     const parentItem = itemUid ? findItemInCollection(collection, itemUid) : collection;
-    const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
     if (!parentItem) {
       return reject(new Error('Parent item not found'));
@@ -1495,7 +1753,10 @@ export const newWsRequest = (params) => (dispatch, getState) => {
 
     const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
     item.seq = items.length + 1;
-    const fullName = path.join(parentItem.pathname, resolvedFilename);
+    const fullName = isScratchpad && !itemUid
+      ? `/scratchpad/root/${resolvedFilename}`
+      : path.join(parentItem.pathname, resolvedFilename);
+    item.pathname = fullName;
     const { ipcRenderer } = window;
     ipcRenderer
       .invoke('renderer:new-request', fullName, item)

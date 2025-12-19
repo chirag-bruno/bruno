@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import get from 'lodash/get';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   requestUrlChanged,
   updateRequestMethod,
@@ -12,16 +12,17 @@ import {
   updateRequestAuthMode,
   updateAuth
 } from 'providers/ReduxStore/slices/collections';
-import { saveRequest, cancelRequest } from 'providers/ReduxStore/slices/collections/actions';
+import { saveRequest, cancelRequest, saveScratchpadRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
 import { getRequestFromCurlCommand } from 'utils/curl';
 import HttpMethodSelector from './HttpMethodSelector';
 import { useTheme } from 'providers/Theme';
 import { IconDeviceFloppy, IconArrowRight, IconCode, IconSquareRoundedX } from '@tabler/icons';
 import SingleLineEditor from 'components/SingleLineEditor';
 import { isMacOS } from 'utils/common/platform';
-import { hasRequestChanges } from 'utils/collections';
+import { hasRequestChanges, isScratchpadCollection } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
 import GenerateCodeItem from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/index';
+import SaveScratchpadRequestModal from 'components/SaveScratchpadRequestModal';
 import toast from 'react-hot-toast';
 
 const QueryUrl = ({ item, collection, handleRun }) => {
@@ -34,9 +35,11 @@ const QueryUrl = ({ item, collection, handleRun }) => {
   const editorRef = useRef(null);
   const isGrpc = item.type === 'grpc-request';
   const isLoading = ['queued', 'sending'].includes(item.requestState);
+  const isScratchpad = isScratchpadCollection(collection);
 
   const [methodSelectorWidth, setMethodSelectorWidth] = useState(90);
   const [generateCodeItemModalOpen, setGenerateCodeItemModalOpen] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const hasChanges = useMemo(() => hasRequestChanges(item), [item]);
 
   useEffect(() => {
@@ -44,9 +47,39 @@ const QueryUrl = ({ item, collection, handleRun }) => {
     setMethodSelectorWidth(el.offsetWidth);
   }, [method]);
 
+  // Listen for global save modal trigger event (from hotkey handler)
+  useEffect(() => {
+    const handleShowSaveModal = (event) => {
+      // Only show modal if this event is for the current item
+      if (event.detail && event.detail.itemUid === item.uid && isScratchpad) {
+        setShowSaveModal(true);
+      }
+    };
+
+    window.addEventListener('bruno:show-save-modal', handleShowSaveModal);
+    return () => {
+      window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
+    };
+  }, [item.uid, isScratchpad]);
+
   const onSave = () => {
-    dispatch(saveRequest(item.uid, collection.uid));
+    if (isScratchpad) {
+      setShowSaveModal(true);
+    } else {
+      dispatch(saveRequest(item.uid, collection.uid));
+    }
   };
+
+  const handleSaveModalSave = useCallback(({ targetCollectionUid, targetFolderUid, requestName }) => {
+    dispatch(saveScratchpadRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
+      .then(() => {
+        setShowSaveModal(false);
+      })
+      .catch((err) => {
+        // Error is already shown via toast in the action
+        console.error('Failed to save scratchpad request:', err);
+      });
+  }, [dispatch, item.uid]);
 
   const onUrlChange = (value) => {
     if (!editorRef.current?.editor) return;
@@ -462,6 +495,13 @@ const QueryUrl = ({ item, collection, handleRun }) => {
           collectionUid={collection.uid}
           item={item}
           onClose={() => setGenerateCodeItemModalOpen(false)}
+        />
+      )}
+      {showSaveModal && (
+        <SaveScratchpadRequestModal
+          onClose={() => setShowSaveModal(false)}
+          onSave={handleSaveModalSave}
+          request={item}
         />
       )}
     </StyledWrapper>

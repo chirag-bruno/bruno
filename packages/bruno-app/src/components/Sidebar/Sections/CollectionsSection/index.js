@@ -16,6 +16,7 @@ import {
 import { importCollection, openCollection } from 'providers/ReduxStore/slices/collections/actions';
 import { sortCollections } from 'providers/ReduxStore/slices/collections/index';
 import { normalizePath } from 'utils/common/path';
+import { isScratchpadCollection } from 'utils/collections';
 
 import MenuDropdown from 'ui/MenuDropdown';
 import ActionIcon from 'ui/ActionIcon';
@@ -46,7 +47,8 @@ const CollectionsSection = () => {
   const workspaceCollections = useMemo(() => {
     if (!activeWorkspace) return [];
     return collections.filter((c) =>
-      activeWorkspace.collections?.some((wc) => normalizePath(wc.path) === normalizePath(c.pathname))
+      !isScratchpadCollection(c)
+      && activeWorkspace.collections?.some((wc) => normalizePath(wc.path) === normalizePath(c.pathname))
     );
   }, [activeWorkspace, collections]);
 

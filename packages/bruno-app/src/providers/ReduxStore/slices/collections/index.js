@@ -188,19 +188,109 @@ export const collectionsSlice = createSlice({
     removeCollection: (state, action) => {
       state.collections = filter(state.collections, (c) => c.uid !== action.payload.collectionUid);
     },
+    createScratchpadCollection: (state) => {
+      // Check if scratchpad already exists
+      const existingScratchpad = findCollectionByUid(state.collections, 'scratchpad');
+      if (existingScratchpad) {
+        return;
+      }
+
+      const scratchpad = {
+        uid: 'scratchpad',
+        name: 'Scratchpad',
+        isScratchpad: true,
+        pathname: '/scratchpad/root',
+        items: [],
+        runtimeVariables: {},
+        brunoConfig: {
+          version: '1',
+          format: 'bru'
+        },
+        format: 'bru',
+        settingsSelectedTab: 'overview',
+        folderLevelSettingsSelectedTab: {},
+        allTags: [],
+        mountStatus: 'mounted',
+        importedAt: new Date().getTime(),
+        lastAction: null,
+        collapsed: false,
+        environments: [],
+        selectedEnvironment: null,
+        securityConfig: {
+          jsSandboxMode: 'safe'
+        },
+        root: {
+          docs: `# 🎨 Welcome to Scratchpad!
+
+Hey there! 👋 Welcome to your creative playground for API requests!
+
+## What's This All About?
+
+Think of Scratchpad as your **digital sticky notes** for API testing! It's a super chill space where you can quickly try things out, experiment with ideas, and test endpoints without any commitment. 
+
+Just like sticky notes on your desk, these requests are here for now - perfect for when you're exploring, testing, or just playing around! 🎯
+
+## When to Use Scratchpad
+
+- 🚀 **Quick Tests**: "Hmm, I wonder if this endpoint works..." - just try it!
+- 🧪 **Experiments**: Want to test something wild? Go for it!
+- 💡 **Brainstorming**: Jot down API ideas before organizing them properly
+- 🎪 **One-Off Requests**: Need to check something real quick? Perfect spot!
+
+## What Can You Do?
+
+Everything! 🎉
+- Create any type of request (HTTP, GraphQL, WebSocket, gRPC)
+- Use all the cool Bruno features
+- Set up environments and variables
+- Write scripts and tests
+- Basically, everything you'd do in a regular collection!
+
+## Friendly Reminder ⚠️
+
+Just a heads up - requests here are like sandcastles on the beach 🌊 They're awesome while you're working, but they'll disappear when you close Bruno. 
+
+**Want to keep something forever?** No worries! Just create a regular collection or move your favorite requests there. Easy peasy! ✨
+
+Now go ahead and create something amazing! 🎨✨`
+        }
+      };
+
+      collapseAllItemsInCollection(scratchpad);
+      addDepth(scratchpad.items);
+      state.collections.push(scratchpad);
+    },
+    removeScratchpadRequests: (state, action) => {
+      const scratchpad = findCollectionByUid(state.collections, 'scratchpad');
+      if (scratchpad && action.payload.requestUids) {
+        scratchpad.items = filter(scratchpad.items, (item) => !action.payload.requestUids.includes(item.uid));
+      }
+    },
     sortCollections: (state, action) => {
       state.collectionSortOrder = action.payload.order;
       const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+      // Separate scratchpad from regular collections
+      const scratchpad = findCollectionByUid(state.collections, 'scratchpad');
+      const regularCollections = state.collections.filter((c) => c.uid !== 'scratchpad');
+
       switch (action.payload.order) {
         case 'default':
-          state.collections = state.collections.sort((a, b) => a.importedAt - b.importedAt);
+          regularCollections.sort((a, b) => a.importedAt - b.importedAt);
           break;
         case 'alphabetical':
-          state.collections = state.collections.sort((a, b) => collator.compare(a.name, b.name));
+          regularCollections.sort((a, b) => collator.compare(a.name, b.name));
           break;
         case 'reverseAlphabetical':
-          state.collections = state.collections.sort((a, b) => -collator.compare(a.name, b.name));
+          regularCollections.sort((a, b) => -collator.compare(a.name, b.name));
           break;
+      }
+
+      // Recombine: scratchpad first, then sorted collections
+      if (scratchpad) {
+        state.collections = [scratchpad, ...regularCollections];
+      } else {
+        state.collections = regularCollections;
       }
     },
     moveCollection: (state, action) => {
@@ -3369,6 +3459,8 @@ export const collectionsSlice = createSlice({
 
 export const {
   createCollection,
+  createScratchpadCollection,
+  removeScratchpadRequests,
   updateCollectionMountStatus,
   updateCollectionLoadingState,
   setCollectionSecurityConfig,

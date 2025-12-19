@@ -36,6 +36,7 @@ import RunCollectionItem from './RunCollectionItem';
 import GenerateCodeItem from './GenerateCodeItem';
 import { isItemARequest, isItemAFolder } from 'utils/tabs';
 import { doesRequestMatchSearchText, doesFolderHaveItemsMatchSearchText } from 'utils/collections/search';
+import { isScratchpadCollection } from 'utils/collections';
 import { getDefaultRequestPaneTab } from 'utils/collections';
 import { hideHomePage, hideApiSpecPage } from 'providers/ReduxStore/slices/app';
 import toast from 'react-hot-toast';
@@ -66,6 +67,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
   const collection = useSelector((state) => state.collections.collections?.find((c) => c.uid === collectionUid));
   const { hasCopiedItems } = useSelector((state) => state.app.clipboard);
   const dispatch = useDispatch();
+  const isScratchpad = collection && isScratchpadCollection(collection);
 
   // We use a single ref for drag and drop.
   const ref = useRef(null);
@@ -284,6 +286,9 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
 
   // Handle right-click context menu
   const handleContextMenu = (e) => {
+    if (isScratchpad) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     menuDropdownRef.current?.show();
@@ -625,7 +630,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
         data-testid="sidebar-collection-item-row"
       >
         <div className="flex items-center h-full w-full">
-          {indents && indents.length
+          {!isScratchpad && indents && indents.length
             ? indents.map((i) => (
                 <div
                   onClick={handleClick}
@@ -674,18 +679,20 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
               </span>
             </div>
           </div>
-          <div className="pr-2">
-            <MenuDropdown
-              ref={menuDropdownRef}
-              items={buildMenuItems()}
-              placement="bottom-start"
-              data-testid="collection-item-menu"
-            >
-              <ActionIcon className="menu-icon">
-                <IconDots size={18} className="collection-item-menu-icon" />
-              </ActionIcon>
-            </MenuDropdown>
-          </div>
+          {!isScratchpad && (
+            <div className="pr-2">
+              <MenuDropdown
+                ref={menuDropdownRef}
+                items={buildMenuItems()}
+                placement="bottom-start"
+                data-testid="collection-item-menu"
+              >
+                <ActionIcon className="menu-icon">
+                  <IconDots size={18} className="collection-item-menu-icon" />
+                </ActionIcon>
+              </MenuDropdown>
+            </div>
+          )}
         </div>
       </div>
       {!itemIsCollapsed ? (
