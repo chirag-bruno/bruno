@@ -100,6 +100,9 @@ const StyledWrapper = styled.div`
   .theme-list {
     min-width: 180px;
     padding-top: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .theme-list-label {
