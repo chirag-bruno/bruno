@@ -38,7 +38,6 @@ import { isItemARequest, isItemAFolder } from 'utils/tabs';
 import { doesRequestMatchSearchText, doesFolderHaveItemsMatchSearchText } from 'utils/collections/search';
 import { isScratchpadCollection } from 'utils/collections';
 import { getDefaultRequestPaneTab } from 'utils/collections';
-import { hideHomePage, hideApiSpecPage } from 'providers/ReduxStore/slices/app';
 import toast from 'react-hot-toast';
 import StyledWrapper from './StyledWrapper';
 import NetworkError from 'components/ResponsePane/NetworkError/index';
@@ -49,14 +48,17 @@ import ExampleIcon from 'components/Icons/ExampleIcon';
 import { scrollToTheActiveTab } from 'utils/tabs';
 import { isTabForItemActive as isTabForItemActiveSelector, isTabForItemPresent as isTabForItemPresentSelector } from 'src/selectors/tab';
 import { isEqual } from 'lodash';
-import { calculateDraggedItemNewPathname, getInitialExampleName } from 'utils/collections/index';
+import { calculateDraggedItemNewPathname, getInitialExampleName, findParentItemInCollection } from 'utils/collections/index';
 import { sortByNameThenSequence } from 'utils/common/index';
+import { getRevealInFolderLabel } from 'utils/common/platform';
 import CreateExampleModal from 'components/ResponseExample/CreateExampleModal';
 import { openDevtoolsAndSwitchToTerminal } from 'utils/terminal';
 import ActionIcon from 'ui/ActionIcon';
 import MenuDropdown from 'ui/MenuDropdown';
+import { useSidebarAccordion } from 'components/Sidebar/SidebarAccordionContext';
 
 const CollectionItem = ({ item, collectionUid, collectionPathname, searchText }) => {
+  const { dropdownContainerRef } = useSidebarAccordion();
   const _isTabForItemActiveSelector = isTabForItemActiveSelector({ itemUid: item.uid });
   const isTabForItemActive = useSelector(_isTabForItemActiveSelector, isEqual);
 
@@ -216,8 +218,6 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
     setTimeout(scrollToTheActiveTab, 50);
     const isRequest = isItemARequest(item);
     if (isRequest) {
-      dispatch(hideHomePage());
-      dispatch(hideApiSpecPage());
       if (isTabForItemPresent) {
         dispatch(
           focusTab({
@@ -235,8 +235,6 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
         })
       );
     } else {
-      dispatch(hideHomePage());
-      dispatch(hideApiSpecPage());
       dispatch(
         addTab({
           uid: item.uid,
@@ -298,14 +296,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
 
   // Build menu items for MenuDropdown
   const buildMenuItems = () => {
-    const items = [
-      {
-        id: 'info',
-        leftSection: IconInfoCircle,
-        label: 'Info',
-        onClick: () => setItemInfoModalOpen(true)
-      }
-    ];
+    const items = [];
 
     if (isFolder) {
       items.push(
@@ -360,12 +351,6 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
         leftSection: IconEdit,
         label: 'Rename',
         onClick: () => setRenameItemModalOpen(true)
-      },
-      {
-        id: 'show-in-folder',
-        leftSection: IconFolder,
-        label: 'Show in Folder',
-        onClick: handleShowInFolder
       }
     );
     if (!isFolder && isItemARequest(item) && !(item.type === 'http-request' || item.type === 'graphql-request')) {
@@ -397,7 +382,23 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
       });
     }
 
+    items.push(
+      {
+        id: 'show-in-folder',
+        leftSection: IconFolder,
+        label: getRevealInFolderLabel(),
+        onClick: handleShowInFolder
+      }
+    );
+
     items.push({ id: 'separator-1', type: 'divider' });
+
+    items.push({
+      id: 'info',
+      leftSection: IconInfoCircle,
+      label: 'Info',
+      onClick: () => setItemInfoModalOpen(true)
+    });
 
     if (isFolder) {
       items.push(
@@ -543,13 +544,14 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
   };
 
   const handlePasteItem = () => {
-    // Only allow paste into folders
+    // Determine target folder: if item is a folder, paste into it; otherwise paste into parent folder
+    let targetFolderUid = item.uid;
     if (!isFolder) {
-      toast.error('Paste is only available for folders');
-      return;
+      const parentFolder = findParentItemInCollection(collection, item.uid);
+      targetFolderUid = parentFolder ? parentFolder.uid : null;
     }
 
-    dispatch(pasteItem(collectionUid, item.uid))
+    dispatch(pasteItem(collectionUid, targetFolderUid))
       .then(() => {
         toast.success('Item pasted successfully');
       })
@@ -649,8 +651,9 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
           >
-            <ActionIcon style={{ width: 16, minWidth: 16 }}>
-              {isFolder ? (
+
+            {isFolder ? (
+              <ActionIcon style={{ width: 16, minWidth: 16 }}>
                 <IconChevronRight
                   size={16}
                   strokeWidth={2}
@@ -660,7 +663,9 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
                   onDoubleClick={handleFolderDoubleClick}
                   data-testid="folder-chevron"
                 />
-              ) : hasExamples ? (
+              </ActionIcon>
+            ) : hasExamples ? (
+              <ActionIcon style={{ width: 16, minWidth: 16 }}>
                 <IconChevronRight
                   size={16}
                   strokeWidth={2}
@@ -670,8 +675,9 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
                   onDoubleClick={handleExamplesDoubleClick}
                   data-testid="request-item-chevron"
                 />
-              ) : null}
-            </ActionIcon>
+              </ActionIcon>
+            ) : null}
+
             <div className="ml-1 flex w-full h-full items-center overflow-hidden">
               <CollectionItemIcon item={item} />
               <span className="item-name" title={item.name}>
@@ -686,6 +692,8 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
                 items={buildMenuItems()}
                 placement="bottom-start"
                 data-testid="collection-item-menu"
+                popperOptions={{ strategy: 'fixed' }}
+                appendTo={dropdownContainerRef?.current || document.body}
               >
                 <ActionIcon className="menu-icon">
                   <IconDots size={18} className="collection-item-menu-icon" />

@@ -33,34 +33,12 @@ const QueryUrl = ({ item, collection, handleRun }) => {
   const isMac = isMacOS();
   const saveShortcut = isMac ? 'Cmd + S' : 'Ctrl + S';
   const editorRef = useRef(null);
-  const isGrpc = item.type === 'grpc-request';
   const isLoading = ['queued', 'sending'].includes(item.requestState);
   const isScratchpad = isScratchpadCollection(collection);
 
-  const [methodSelectorWidth, setMethodSelectorWidth] = useState(90);
   const [generateCodeItemModalOpen, setGenerateCodeItemModalOpen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const hasChanges = useMemo(() => hasRequestChanges(item), [item]);
-
-  useEffect(() => {
-    const el = document.querySelector('.method-selector-container');
-    setMethodSelectorWidth(el.offsetWidth);
-  }, [method]);
-
-  // Listen for global save modal trigger event (from hotkey handler)
-  useEffect(() => {
-    const handleShowSaveModal = (event) => {
-      // Only show modal if this event is for the current item
-      if (event.detail && event.detail.itemUid === item.uid && isScratchpad) {
-        setShowSaveModal(true);
-      }
-    };
-
-    window.addEventListener('bruno:show-save-modal', handleShowSaveModal);
-    return () => {
-      window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
-    };
-  }, [item.uid, isScratchpad]);
 
   const onSave = () => {
     if (isScratchpad) {
@@ -135,7 +113,7 @@ const QueryUrl = ({ item, collection, handleRun }) => {
 
     const curlCommandRegex = /^\s*curl\s/i;
     if (!curlCommandRegex.test(pastedData)) {
-      toast.error('Invalid cURL command');
+      // Not a curl command, allow normal paste behavior
       return;
     }
     event.preventDefault();
@@ -409,24 +387,13 @@ const QueryUrl = ({ item, collection, handleRun }) => {
     dispatch(cancelRequest(item.cancelTokenUid, item, collection));
   };
   return (
-    <StyledWrapper className="flex items-center">
-      <div className="flex flex-1 items-center h-full method-selector-container">
-        {isGrpc ? (
-          <div className="flex items-center justify-center h-full w-16">
-            <span className="text-xs text-indigo-500 font-bold">gRPC</span>
-          </div>
-        ) : (
-          <HttpMethodSelector method={method} onMethodSelect={onMethodSelect} />
-        )}
+    <StyledWrapper className="flex items-center w-full">
+      <div className="flex items-center h-full min-w-fit">
+        <HttpMethodSelector method={method} onMethodSelect={onMethodSelect} />
       </div>
       <div
         id="request-url"
-        className="flex items-center flex-grow input-container h-full"
-        style={{
-          color: 'yellow',
-          width: `calc(100% - ${methodSelectorWidth}px)`,
-          maxWidth: `calc(100% - ${methodSelectorWidth}px)`
-        }}
+        className="h-full w-full flex flex-row input-container overflow-auto"
       >
         <SingleLineEditor
           ref={editorRef}
@@ -442,53 +409,54 @@ const QueryUrl = ({ item, collection, handleRun }) => {
           item={item}
           showNewlineArrow={true}
         />
-        <div className="flex items-center h-full mr-2 cursor-pointer" id="send-request" onClick={handleRun}>
-          <div
-            title="Generate Code"
-            className="infotip mr-3"
-            onClick={(e) => {
-              handleGenerateCode(e);
-            }}
-          >
-            <IconCode color={theme.requestTabs.icon.color} strokeWidth={1.5} size={20} className="cursor-pointer" />
-            <span className="infotiptext text-xs">Generate Code</span>
-          </div>
-          <div
-            title="Save Request"
-            className="infotip mr-3"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!hasChanges) return;
-              onSave();
-            }}
-          >
-            <IconDeviceFloppy
-              color={hasChanges ? theme.colors.text.yellow : theme.requestTabs.icon.color}
-              strokeWidth={1.5}
-              size={20}
-              className={`${hasChanges ? 'cursor-pointer' : 'cursor-default'}`}
-            />
-            <span className="infotiptext text-xs">
-              Save <span className="shortcut">({saveShortcut})</span>
-            </span>
-          </div>
-          {isLoading || item.response?.stream?.running ? (
-            <IconSquareRoundedX
-              color={theme.requestTabPanel.url.iconDanger}
-              strokeWidth={1.5}
-              size={20}
-              data-testid="cancel-request-icon"
-              onClick={handleCancelRequest}
-            />
-          ) : (
-            <IconArrowRight
-              color={theme.requestTabPanel.url.icon}
-              strokeWidth={1.5}
-              size={20}
-              data-testid="send-arrow-icon"
-            />
-          )}
+
+      </div>
+      <div className="flex items-center h-full mx-2 gap-3 cursor-pointer" id="send-request" onClick={handleRun}>
+        <div
+          title="Generate Code"
+          className="infotip"
+          onClick={(e) => {
+            handleGenerateCode(e);
+          }}
+        >
+          <IconCode color={theme.requestTabs.icon.color} strokeWidth={1.5} size={20} className="cursor-pointer" />
+          <span className="infotiptext text-xs">Generate Code</span>
         </div>
+        <div
+          title="Save Request"
+          className="infotip"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!hasChanges) return;
+            onSave();
+          }}
+        >
+          <IconDeviceFloppy
+            color={hasChanges ? theme.draftColor : theme.requestTabs.icon.color}
+            strokeWidth={1.5}
+            size={20}
+            className={`${hasChanges ? 'cursor-pointer' : 'cursor-default'}`}
+          />
+          <span className="infotiptext text-xs">
+            Save <span className="shortcut">({saveShortcut})</span>
+          </span>
+        </div>
+        {isLoading || item.response?.stream?.running ? (
+          <IconSquareRoundedX
+            color={theme.requestTabPanel.url.iconDanger}
+            strokeWidth={1.5}
+            size={20}
+            data-testid="cancel-request-icon"
+            onClick={handleCancelRequest}
+          />
+        ) : (
+          <IconArrowRight
+            color={theme.requestTabPanel.url.icon}
+            strokeWidth={1.5}
+            size={20}
+            data-testid="send-arrow-icon"
+          />
+        )}
       </div>
       {generateCodeItemModalOpen && (
         <GenerateCodeItem

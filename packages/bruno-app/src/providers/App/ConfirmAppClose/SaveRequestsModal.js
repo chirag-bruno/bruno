@@ -11,6 +11,7 @@ import { saveMultipleRequests, saveMultipleCollections, saveMultipleFolders, sav
 import { IconAlertTriangle } from '@tabler/icons';
 import Modal from 'components/Modal';
 import SelectCollection from 'components/Sidebar/Collections/SelectCollection';
+import Button from 'ui/Button';
 
 const SaveRequestsModal = ({ onClose }) => {
   const MAX_UNSAVED_ITEMS_TO_SHOW = 5;
@@ -217,17 +218,17 @@ const SaveRequestsModal = ({ onClose }) => {
 
       <div className="flex justify-between mt-6">
         <div>
-          <button className="btn btn-sm btn-danger" onClick={closeWithoutSave}>
+          <Button color="danger" onClick={closeWithoutSave}>
             Don't Save
-          </button>
+          </Button>
         </div>
-        <div>
-          <button className="btn btn-close btn-sm mr-2" onClick={onClose}>
+        <div className="flex gap-2">
+          <Button size="sm" color="secondary" variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={closeWithSave}>
+          </Button>
+          <Button onClick={closeWithSave}>
             {totalDraftsCount > 1 ? 'Save All' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
 
