@@ -2,14 +2,14 @@ const { fs: memfs, vol } = require('memfs');
 const realFs = require('fs');
 const path = require('path');
 
-// Map to store memfs instances per scratchpad collection UID
+// Map to store memfs instances per sandbox collection UID
 const virtualFsMap = new Map();
 
 // Map to store collection UID by virtual path prefix
 const collectionUidByPath = new Map();
 
 /**
- * Check if a pathname is a virtual (scratchpad) path
+ * Check if a pathname is a virtual (sandbox) path
  * @param {string} pathname - The pathname to check
  * @returns {boolean} - True if the path is virtual
  */
@@ -17,7 +17,7 @@ const isVirtualPath = (pathname) => {
   if (!pathname || typeof pathname !== 'string') {
     return false;
   }
-  return pathname.startsWith('/scratchpad/');
+  return pathname.startsWith('/sandbox/');
 };
 
 /**
@@ -30,18 +30,18 @@ const getCollectionUidFromPath = (pathname) => {
     return null;
   }
 
-  // Path format: /scratchpad/root/filename.bru
-  // For now, we only support one scratchpad with UID 'scratchpad'
-  // If we need multiple scratchpads later, we can extend this
-  if (pathname.startsWith('/scratchpad/')) {
-    return 'scratchpad';
+  // Path format: /sandbox/root/filename.bru
+  // For now, we only support one sandbox with UID 'sandbox'
+  // If we need multiple sandboxes later, we can extend this
+  if (pathname.startsWith('/sandbox/')) {
+    return 'sandbox';
   }
 
   return null;
 };
 
 /**
- * Get or create a memfs instance for a scratchpad collection
+ * Get or create a memfs instance for a sandbox collection
  * @param {string} collectionUid - The collection UID
  * @returns {Object} - The memfs filesystem instance
  */
@@ -51,10 +51,10 @@ const getVirtualFsForCollection = (collectionUid) => {
     const { fs, vol: newVol } = require('memfs');
 
     // Initialize root directory structure
-    newVol.mkdirSync('/scratchpad/root', { recursive: true });
+    newVol.mkdirSync('/sandbox/root', { recursive: true });
 
     virtualFsMap.set(collectionUid, fs);
-    collectionUidByPath.set('/scratchpad/', collectionUid);
+    collectionUidByPath.set('/sandbox/', collectionUid);
   }
 
   return virtualFsMap.get(collectionUid);
@@ -78,22 +78,22 @@ const getFsForPath = (pathname) => {
 /**
  * Get the appropriate filesystem for a collection
  * @param {string} collectionUid - The collection UID
- * @param {string} collectionPathname - The collection pathname (can be null for scratchpad)
+ * @param {string} collectionPathname - The collection pathname (can be null for sandbox)
  * @returns {Object} - The filesystem object (memfs or real fs)
  */
 const getFsForCollection = (collectionUid, collectionPathname) => {
-  // Check if it's scratchpad by UID or pathname
-  if (collectionUid === 'scratchpad' || !collectionPathname || isVirtualPath(collectionPathname)) {
-    return getVirtualFsForCollection(collectionUid || 'scratchpad');
+  // Check if it's sandbox by UID or pathname
+  if (collectionUid === 'sandbox' || !collectionPathname || isVirtualPath(collectionPathname)) {
+    return getVirtualFsForCollection(collectionUid || 'sandbox');
   }
   return realFs;
 };
 
 /**
- * Initialize virtual filesystem for scratchpad collection
- * @param {string} collectionUid - The collection UID (should be 'scratchpad')
+ * Initialize virtual filesystem for sandbox collection
+ * @param {string} collectionUid - The collection UID (should be 'sandbox')
  */
-const initializeScratchpadFs = (collectionUid = 'scratchpad') => {
+const initializeSandboxFs = (collectionUid = 'sandbox') => {
   getVirtualFsForCollection(collectionUid);
 };
 
@@ -179,7 +179,7 @@ module.exports = {
   getCollectionUidFromPath,
   getFsForPath,
   getFsForCollection,
-  initializeScratchpadFs,
+  initializeSandboxFs,
   clearVirtualFs,
   // Wrapper functions
   readFileSync,

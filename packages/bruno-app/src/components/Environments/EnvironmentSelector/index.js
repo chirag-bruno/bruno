@@ -13,6 +13,7 @@ import ImportEnvironmentModal from 'components/Environments/Common/ImportEnviron
 import CreateGlobalEnvironment from 'components/WorkspaceHome/WorkspaceEnvironments/CreateEnvironment';
 import ToolHint from 'components/ToolHint';
 import StyledWrapper from './StyledWrapper';
+import { useEffect } from 'react';
 
 const EnvironmentSelector = ({ collection }) => {
   const dispatch = useDispatch();
@@ -22,6 +23,7 @@ const EnvironmentSelector = ({ collection }) => {
   const [showImportGlobalModal, setShowImportGlobalModal] = useState(false);
   const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
   const [showImportCollectionModal, setShowImportCollectionModal] = useState(false);
+  const isSandbox = collection?.isSandbox ?? false;
 
   const globalEnvironments = useSelector((state) => state.globalEnvironments.globalEnvironments);
   const activeGlobalEnvironmentUid = useSelector((state) => state.globalEnvironments.activeGlobalEnvironmentUid);
@@ -38,7 +40,18 @@ const EnvironmentSelector = ({ collection }) => {
   const tabs = [
     { id: 'collection', label: 'Collection', icon: <IconDatabase size={16} strokeWidth={1.5} /> },
     { id: 'global', label: 'Global', icon: <IconWorld size={16} strokeWidth={1.5} /> }
-  ];
+  ].filter((tab) => {
+    if (isSandbox) {
+      return tab.id === 'global';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (isSandbox) {
+      setActiveTab('global');
+    }
+  }, [isSandbox]);
 
   const onDropdownCreate = (ref) => {
     dropdownTippyRef.current = ref;

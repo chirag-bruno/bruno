@@ -95,7 +95,7 @@ const envHasSecrets = (environment = {}) => {
 
 const findCollectionPathByItemPath = (filePath) => {
   if (isVirtualPath(filePath)) {
-    return '/scratchpad/root';
+    return '/sandbox/root';
   }
 
   const allCollectionPaths = collectionWatcher.getAllWatcherPaths();
@@ -363,7 +363,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       vfsWriteFileSync(pathname, content, 'utf8');
 
       if (isVirtualPath(pathname)) {
-        const collectionUid = getCollectionUidFromPath(pathname) || 'scratchpad';
+        const collectionUid = getCollectionUidFromPath(pathname) || 'sandbox';
         const useWorkerThread = false;
         await collectionWatcher.addFile(mainWindow, pathname, collectionUid, collectionPath, useWorkerThread);
       }

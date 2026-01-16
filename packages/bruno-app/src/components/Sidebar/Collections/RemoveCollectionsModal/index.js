@@ -16,7 +16,7 @@ import {
   isItemARequest,
   isItemAFolder,
   hasRequestChanges,
-  isScratchpadCollection
+  isSandboxCollection
 } from 'utils/collections/index';
 import { IconAlertTriangle } from '@tabler/icons';
 import StyledWrapper from './StyledWrapper';
@@ -59,7 +59,7 @@ const RemoveCollectionsModal = ({ collectionUids, onClose }) => {
 
     collectionUids.forEach((collectionUid) => {
       const collection = findCollectionByUid(allCollections, collectionUid);
-      if (!collection || isScratchpadCollection(collection)) {
+      if (!collection || isSandboxCollection(collection)) {
         return;
       }
 

@@ -52,7 +52,7 @@ const initialState = {
   clipboard: {
     hasCopiedItems: false // Whether clipboard has Bruno data (for UI)
   },
-  scratchpad: {
+  sandbox: {
     lastCreatedRequestType: 'http-request' // Default to HTTP
   }
 };
@@ -131,8 +131,8 @@ export const appSlice = createSlice({
       // Update clipboard UI state
       state.clipboard.hasCopiedItems = action.payload.hasCopiedItems;
     },
-    updateScratchpadLastRequestType: (state, action) => {
-      state.scratchpad.lastCreatedRequestType = action.payload;
+    updateSandboxLastRequestType: (state, action) => {
+      state.sandbox.lastCreatedRequestType = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -172,7 +172,7 @@ export const {
   updateGenerateCode,
   toggleSidebarCollapse,
   setClipboard,
-  updateScratchpadLastRequestType
+  updateSandboxLastRequestType
 } = appSlice.actions;
 
 export const savePreferences = (preferences) => (dispatch, getState) => {

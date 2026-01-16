@@ -234,7 +234,7 @@ const generateUniqueName = (baseName, checkExists) => {
 };
 
 const getCollectionFormat = (collectionPath) => {
-  // Virtual paths (scratchpad) always use 'bru' format
+  // Virtual paths (sandbox) always use 'bru' format
   if (isVirtualPath(collectionPath)) {
     return 'bru';
   }
@@ -474,7 +474,7 @@ const isCollectionRootBruFile = (pathname, collectionPath) => {
 };
 
 /**
- * Check if a pathname is a virtual (scratchpad) path
+ * Check if a pathname is a virtual (sandbox) path
  * @param {string} pathname - The pathname to check
  * @returns {boolean} - True if the path is virtual
  */
@@ -482,7 +482,7 @@ const isVirtualPath = (pathname) => {
   if (!pathname || typeof pathname !== 'string') {
     return false;
   }
-  return pathname.startsWith('/scratchpad/');
+  return pathname.startsWith('/sandbox/');
 };
 
 module.exports = {

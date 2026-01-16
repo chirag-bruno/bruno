@@ -85,8 +85,8 @@ export const findCollectionByPathname = (collections, pathname) => {
   return find(collections, (c) => c.pathname === pathname);
 };
 
-export const isScratchpadCollection = (collection) => {
-  return collection && (collection.isScratchpad === true || collection.uid === 'scratchpad');
+export const isSandboxCollection = (collection) => {
+  return collection && (collection.isSandbox === true || collection.uid === 'sandbox');
 };
 
 export const findCollectionByItemUid = (collections, itemUid) => {

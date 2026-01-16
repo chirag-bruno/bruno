@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { get } from 'lodash';
 import { useDispatch } from 'react-redux';
 import { refreshScreenWidth } from 'providers/ReduxStore/slices/app';
-import { createScratchpadCollection } from 'providers/ReduxStore/slices/collections';
+import { createSandboxCollection } from 'providers/ReduxStore/slices/collections';
 import ConfirmAppClose from './ConfirmAppClose';
 import useIpcEvents from './useIpcEvents';
 import useTelemetry from './useTelemetry';
@@ -18,7 +18,7 @@ export const AppProvider = (props) => {
 
   useEffect(() => {
     dispatch(refreshScreenWidth());
-    dispatch(createScratchpadCollection());
+    dispatch(createSandboxCollection());
   }, []);
 
   useEffect(() => {

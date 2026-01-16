@@ -76,7 +76,7 @@ const TreeItem = ({ item, collection, selectedFolderUid, onFolderSelect, expande
   );
 };
 
-const SaveScratchpadRequestModal = ({ onClose, onSave, request }) => {
+const SaveSandboxRequestModal = ({ onClose, onSave, request }) => {
   const { collections } = useSelector((state) => state.collections);
   const [selectedCollectionUid, setSelectedCollectionUid] = useState(null);
   const [selectedFolderUid, setSelectedFolderUid] = useState(null);
@@ -280,4 +280,4 @@ const SaveScratchpadRequestModal = ({ onClose, onSave, request }) => {
   );
 };
 
-export default SaveScratchpadRequestModal;
+export default SaveSandboxRequestModal;

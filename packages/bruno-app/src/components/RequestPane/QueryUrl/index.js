@@ -12,17 +12,17 @@ import {
   updateRequestAuthMode,
   updateAuth
 } from 'providers/ReduxStore/slices/collections';
-import { saveRequest, cancelRequest, saveScratchpadRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
+import { saveRequest, cancelRequest, saveSandboxRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
 import { getRequestFromCurlCommand } from 'utils/curl';
 import HttpMethodSelector from './HttpMethodSelector';
 import { useTheme } from 'providers/Theme';
 import { IconDeviceFloppy, IconArrowRight, IconCode, IconSquareRoundedX } from '@tabler/icons';
 import SingleLineEditor from 'components/SingleLineEditor';
 import { isMacOS } from 'utils/common/platform';
-import { hasRequestChanges, isScratchpadCollection } from 'utils/collections';
+import { hasRequestChanges, isSandboxCollection } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
 import GenerateCodeItem from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/index';
-import SaveScratchpadRequestModal from 'components/SaveScratchpadRequestModal';
+import SaveSandboxRequestModal from 'components/SaveSandboxRequestModal';
 import toast from 'react-hot-toast';
 
 const QueryUrl = ({ item, collection, handleRun }) => {
@@ -34,14 +34,14 @@ const QueryUrl = ({ item, collection, handleRun }) => {
   const saveShortcut = isMac ? 'Cmd + S' : 'Ctrl + S';
   const editorRef = useRef(null);
   const isLoading = ['queued', 'sending'].includes(item.requestState);
-  const isScratchpad = isScratchpadCollection(collection);
+  const isSandbox = isSandboxCollection(collection);
 
   const [generateCodeItemModalOpen, setGenerateCodeItemModalOpen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const hasChanges = useMemo(() => hasRequestChanges(item), [item]);
 
   const onSave = () => {
-    if (isScratchpad) {
+    if (isSandbox) {
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -49,13 +49,13 @@ const QueryUrl = ({ item, collection, handleRun }) => {
   };
 
   const handleSaveModalSave = useCallback(({ targetCollectionUid, targetFolderUid, requestName }) => {
-    dispatch(saveScratchpadRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
+    dispatch(saveSandboxRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
       .then(() => {
         setShowSaveModal(false);
       })
       .catch((err) => {
         // Error is already shown via toast in the action
-        console.error('Failed to save scratchpad request:', err);
+        console.error('Failed to save sandbox request:', err);
       });
   }, [dispatch, item.uid]);
 
@@ -466,7 +466,7 @@ const QueryUrl = ({ item, collection, handleRun }) => {
         />
       )}
       {showSaveModal && (
-        <SaveScratchpadRequestModal
+        <SaveSandboxRequestModal
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}

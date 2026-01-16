@@ -32,7 +32,7 @@ import NewFolder from 'components/Sidebar/NewFolder';
 import CollectionItem from './CollectionItem';
 import RemoveCollection from './RemoveCollection';
 import { doesCollectionHaveItemsMatchingSearchText } from 'utils/collections/search';
-import { isItemAFolder, isItemARequest, isScratchpadCollection } from 'utils/collections';
+import { isItemAFolder, isItemARequest, isSandboxCollection } from 'utils/collections';
 import { isTabForItemActive } from 'src/selectors/tab';
 
 import RenameCollection from './RenameCollection';
@@ -264,14 +264,14 @@ const Collection = ({ collection, searchText }) => {
     }
   }
 
-  const isScratchpad = isScratchpadCollection(collection);
+  const isSandbox = isSandboxCollection(collection);
 
   const collectionRowClassName = classnames('flex py-1 collection-name items-center', {
     'item-hovered': isOver && dropType === 'adjacent', // For collection-to-collection moves (show line)
     'drop-target': isOver && dropType === 'inside', // For collection-item drops (highlight full area)
     'collection-focused-in-tab': isCollectionFocused && !isKeyboardFocused,
     'collection-keyboard-focused': isKeyboardFocused,
-    'scratchpad-collection': isScratchpad
+    'sandbox-collection': isSandbox
   });
 
   // we need to sort request items by seq property
@@ -292,7 +292,7 @@ const Collection = ({ collection, searchText }) => {
         setShowNewRequestModal(true);
       }
     },
-    ...(isScratchpad
+    ...(isSandbox
       ? []
       : [
           {
@@ -341,7 +341,7 @@ const Collection = ({ collection, searchText }) => {
         setShowRenameCollectionModal(true);
       }
     },
-    ...(isScratchpad
+    ...(isSandbox
       ? []
       : [
           {
@@ -407,7 +407,7 @@ const Collection = ({ collection, searchText }) => {
   return (
     <StyledWrapper className="flex flex-col" id={`collection-${collection.name.replace(/\s+/g, '-').toLowerCase()}`}>
       {showNewRequestModal && <NewRequest collectionUid={collection.uid} onClose={() => setShowNewRequestModal(false)} />}
-      {showNewFolderModal && !isScratchpad && <NewFolder collectionUid={collection.uid} onClose={() => setShowNewFolderModal(false)} />}
+      {showNewFolderModal && !isSandbox && <NewFolder collectionUid={collection.uid} onClose={() => setShowNewFolderModal(false)} />}
       {showRenameCollectionModal && (
         <RenameCollection collectionUid={collection.uid} onClose={() => setShowRenameCollectionModal(false)} />
       )}

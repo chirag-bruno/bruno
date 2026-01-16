@@ -36,7 +36,7 @@ import RunCollectionItem from './RunCollectionItem';
 import GenerateCodeItem from './GenerateCodeItem';
 import { isItemARequest, isItemAFolder } from 'utils/tabs';
 import { doesRequestMatchSearchText, doesFolderHaveItemsMatchSearchText } from 'utils/collections/search';
-import { isScratchpadCollection } from 'utils/collections';
+import { isSandboxCollection } from 'utils/collections';
 import { getDefaultRequestPaneTab } from 'utils/collections';
 import toast from 'react-hot-toast';
 import StyledWrapper from './StyledWrapper';
@@ -69,7 +69,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
   const collection = useSelector((state) => state.collections.collections?.find((c) => c.uid === collectionUid));
   const { hasCopiedItems } = useSelector((state) => state.app.clipboard);
   const dispatch = useDispatch();
-  const isScratchpad = collection && isScratchpadCollection(collection);
+  const isSandbox = collection && isSandboxCollection(collection);
 
   // We use a single ref for drag and drop.
   const ref = useRef(null);
@@ -284,7 +284,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
 
   // Handle right-click context menu
   const handleContextMenu = (e) => {
-    if (isScratchpad) {
+    if (isSandbox) {
       return;
     }
     e.preventDefault();
@@ -632,7 +632,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
         data-testid="sidebar-collection-item-row"
       >
         <div className="flex items-center h-full w-full">
-          {!isScratchpad && indents && indents.length
+          {!isSandbox && indents && indents.length
             ? indents.map((i) => (
                 <div
                   onClick={handleClick}
@@ -685,7 +685,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
               </span>
             </div>
           </div>
-          {!isScratchpad && (
+          {!isSandbox && (
             <div className="pr-2">
               <MenuDropdown
                 ref={menuDropdownRef}

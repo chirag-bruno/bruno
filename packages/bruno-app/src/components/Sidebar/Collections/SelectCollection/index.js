@@ -2,12 +2,12 @@ import React from 'react';
 import Modal from 'components/Modal/index';
 import { IconFiles } from '@tabler/icons';
 import { useSelector } from 'react-redux';
-import { isScratchpadCollection } from 'utils/collections';
+import { isSandboxCollection } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
 
 const SelectCollection = ({ onClose, onSelect, title }) => {
   const { collections } = useSelector((state) => state.collections);
-  const availableCollections = collections.filter((c) => !isScratchpadCollection(c));
+  const availableCollections = collections.filter((c) => !isSandboxCollection(c));
 
   return (
     <StyledWrapper>

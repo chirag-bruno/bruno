@@ -4,10 +4,10 @@ import filter from 'lodash/filter';
 import groupBy from 'lodash/groupBy';
 import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
-import { findCollectionByUid, flattenItems, isItemARequest, hasRequestChanges, isScratchpadCollection } from 'utils/collections';
+import { findCollectionByUid, flattenItems, isItemARequest, hasRequestChanges, isSandboxCollection } from 'utils/collections';
 import { pluralizeWord } from 'utils/common';
 import { completeQuitFlow } from 'providers/ReduxStore/slices/app';
-import { saveMultipleRequests, saveMultipleCollections, saveMultipleFolders, saveScratchpadRequestsToCollection } from 'providers/ReduxStore/slices/collections/actions';
+import { saveMultipleRequests, saveMultipleCollections, saveMultipleFolders, saveSandboxRequestsToCollection } from 'providers/ReduxStore/slices/collections/actions';
 import { IconAlertTriangle } from '@tabler/icons';
 import Modal from 'components/Modal';
 import SelectCollection from 'components/Sidebar/Collections/SelectCollection';
@@ -19,22 +19,22 @@ const SaveRequestsModal = ({ onClose }) => {
   const tabs = useSelector((state) => state.tabs.tabs);
   const dispatch = useDispatch();
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
-  const [pendingScratchpadRequests, setPendingScratchpadRequests] = useState([]);
+  const [pendingSandboxRequests, setPendingSandboxRequests] = useState([]);
 
   const allDrafts = useMemo(() => {
     const requestDrafts = [];
     const collectionDrafts = [];
     const folderDrafts = [];
-    const scratchpadRequestDrafts = [];
+    const sandboxRequestDrafts = [];
     const tabsByCollection = groupBy(tabs, (t) => t.collectionUid);
 
     Object.keys(tabsByCollection).forEach((collectionUid) => {
       const collection = findCollectionByUid(collections, collectionUid);
       if (collection) {
-        const isScratchpad = isScratchpadCollection(collection);
+        const isSandbox = isSandboxCollection(collection);
 
-        // Check for collection draft (skip for scratchpad)
-        if (!isScratchpad && collection.draft) {
+        // Check for collection draft (skip for sandbox)
+        if (!isSandbox && collection.draft) {
           collectionDrafts.push({
             type: 'collection',
             name: collection.name,
@@ -48,9 +48,9 @@ const SaveRequestsModal = ({ onClose }) => {
         // Request drafts
         const requests = filter(items, (item) => isItemARequest(item) && hasRequestChanges(item));
         each(requests, (draft) => {
-          if (isScratchpad) {
-            scratchpadRequestDrafts.push({
-              type: 'scratchpad-request',
+          if (isSandbox) {
+            sandboxRequestDrafts.push({
+              type: 'sandbox-request',
               ...draft,
               collectionUid: collectionUid
             });
@@ -63,8 +63,8 @@ const SaveRequestsModal = ({ onClose }) => {
           }
         });
 
-        // Folder drafts (skip for scratchpad)
-        if (!isScratchpad) {
+        // Folder drafts (skip for sandbox)
+        if (!isSandbox) {
           const folders = filter(items, (item) => item.type === 'folder' && item.draft);
           each(folders, (folder) => {
             folderDrafts.push({
@@ -78,11 +78,11 @@ const SaveRequestsModal = ({ onClose }) => {
       }
     });
 
-    return [...collectionDrafts, ...folderDrafts, ...requestDrafts, ...scratchpadRequestDrafts];
+    return [...collectionDrafts, ...folderDrafts, ...requestDrafts, ...sandboxRequestDrafts];
   }, [collections, tabs]);
 
-  const regularDrafts = allDrafts.filter((d) => d.type !== 'scratchpad-request');
-  const scratchpadDrafts = allDrafts.filter((d) => d.type === 'scratchpad-request');
+  const regularDrafts = allDrafts.filter((d) => d.type !== 'sandbox-request');
+  const sandboxDrafts = allDrafts.filter((d) => d.type === 'sandbox-request');
   const totalDraftsCount = allDrafts.length;
 
   useEffect(() => {
@@ -96,28 +96,28 @@ const SaveRequestsModal = ({ onClose }) => {
     onClose();
   };
 
-  const handleSaveScratchpadRequests = () => {
-    const scratchpadRequests = allDrafts.filter((d) => d.type === 'scratchpad-request');
-    if (scratchpadRequests.length > 0) {
-      setPendingScratchpadRequests(scratchpadRequests.map((r) => r.uid));
+  const handleSaveSandboxRequests = () => {
+    const sandboxRequests = allDrafts.filter((d) => d.type === 'sandbox-request');
+    if (sandboxRequests.length > 0) {
+      setPendingSandboxRequests(sandboxRequests.map((r) => r.uid));
       setShowCollectionPicker(true);
     }
   };
 
   const handleCollectionSelected = async (targetCollectionUid) => {
     try {
-      await dispatch(saveScratchpadRequestsToCollection(pendingScratchpadRequests, targetCollectionUid));
+      await dispatch(saveSandboxRequestsToCollection(pendingSandboxRequests, targetCollectionUid));
       setShowCollectionPicker(false);
-      setPendingScratchpadRequests([]);
+      setPendingSandboxRequests([]);
 
       // Check if there are any remaining drafts
-      const remainingDrafts = allDrafts.filter((d) => d.type !== 'scratchpad-request' || !pendingScratchpadRequests.includes(d.uid));
+      const remainingDrafts = allDrafts.filter((d) => d.type !== 'sandbox-request' || !pendingSandboxRequests.includes(d.uid));
       if (remainingDrafts.length === 0) {
         dispatch(completeQuitFlow());
         onClose();
       }
     } catch (error) {
-      console.error('Error saving scratchpad requests:', error);
+      console.error('Error saving sandbox requests:', error);
     }
   };
 
@@ -127,11 +127,11 @@ const SaveRequestsModal = ({ onClose }) => {
       const collectionDrafts = allDrafts.filter((d) => d.type === 'collection');
       const folderDrafts = allDrafts.filter((d) => d.type === 'folder');
       const requestDrafts = allDrafts.filter((d) => d.type === 'request');
-      const scratchpadRequestDrafts = allDrafts.filter((d) => d.type === 'scratchpad-request');
+      const sandboxRequestDrafts = allDrafts.filter((d) => d.type === 'sandbox-request');
 
-      // If there are scratchpad requests, show collection picker first
-      if (scratchpadRequestDrafts.length > 0) {
-        handleSaveScratchpadRequests();
+      // If there are sandbox requests, show collection picker first
+      if (sandboxRequestDrafts.length > 0) {
+        handleSaveSandboxRequests();
         return;
       }
 
@@ -182,10 +182,10 @@ const SaveRequestsModal = ({ onClose }) => {
         <span className="font-medium">{totalDraftsCount}</span> {pluralizeWord('item', totalDraftsCount)}?
       </p>
 
-      {scratchpadDrafts.length > 0 && (
+      {sandboxDrafts.length > 0 && (
         <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
           <p className="font-medium text-yellow-800">
-            {scratchpadDrafts.length} request(s) in Scratchpad need to be saved to a collection.
+            {sandboxDrafts.length} request(s) in Sandbox need to be saved to a collection.
           </p>
         </div>
       )}
@@ -197,8 +197,8 @@ const SaveRequestsModal = ({ onClose }) => {
               ? 'Collection: '
               : item.type === 'folder'
                 ? 'Folder: '
-                : item.type === 'scratchpad-request'
-                  ? 'Scratchpad Request: '
+                : item.type === 'sandbox-request'
+                  ? 'Sandbox Request: '
                   : 'Request: ';
           return (
             <li key={`${item.type}-${item.collectionUid || item.uid}-${index}`} className="mt-1 text-xs">
@@ -234,10 +234,10 @@ const SaveRequestsModal = ({ onClose }) => {
 
       {showCollectionPicker && (
         <SelectCollection
-          title="Select Collection to Save Scratchpad Requests"
+          title="Select Collection to Save Sandbox Requests"
           onClose={() => {
             setShowCollectionPicker(false);
-            setPendingScratchpadRequests([]);
+            setPendingSandboxRequests([]);
           }}
           onSelect={handleCollectionSelected}
         />

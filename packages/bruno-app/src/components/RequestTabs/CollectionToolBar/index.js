@@ -45,26 +45,37 @@ const CollectionToolBar = ({ collection }) => {
   return (
     <StyledWrapper>
       <div className="flex items-center justify-between gap-2 py-2 px-4">
-        <button className="flex items-center cursor-pointer hover:underline bg-transparent border-none p-0 text-inherit" onClick={viewCollectionSettings}>
+        <button
+          className="flex items-center cursor-pointer hover:underline bg-transparent border-none p-0 text-inherit"
+          onClick={() => {
+            collection?.isSandbox ? null : viewCollectionSettings();
+          }}
+        >
           <IconBox size={18} strokeWidth={1.5} />
           <span className="ml-2 mr-4 font-medium">{collection?.name}</span>
         </button>
         <div className="flex flex-grow gap-1 items-center justify-end">
-          <ToolHint text="Runner" toolhintId="RunnerToolhintId" place="bottom">
-            <ActionIcon onClick={handleRun} aria-label="Runner" size="sm">
-              <IconRun size={16} strokeWidth={1.5} />
-            </ActionIcon>
-          </ToolHint>
-          <ToolHint text="Variables" toolhintId="VariablesToolhintId">
-            <ActionIcon onClick={viewVariables} aria-label="Variables" size="sm">
-              <IconEye size={16} strokeWidth={1.5} />
-            </ActionIcon>
-          </ToolHint>
-          <ToolHint text="Collection Settings" toolhintId="CollectionSettingsToolhintId">
-            <ActionIcon onClick={viewCollectionSettings} aria-label="Collection Settings" size="sm">
-              <IconSettings size={16} strokeWidth={1.5} />
-            </ActionIcon>
-          </ToolHint>
+          {!collection?.isSandbox && (
+            <ToolHint text="Runner" toolhintId="RunnerToolhintId" place="bottom">
+              <ActionIcon onClick={handleRun} aria-label="Runner" size="sm">
+                <IconRun size={16} strokeWidth={1.5} />
+              </ActionIcon>
+            </ToolHint>
+          )}
+          {!collection?.isSandbox && (
+            <ToolHint text="Variables" toolhintId="VariablesToolhintId">
+              <ActionIcon onClick={viewVariables} aria-label="Variables" size="sm">
+                <IconEye size={16} strokeWidth={1.5} />
+              </ActionIcon>
+            </ToolHint>
+          )}
+          {!collection?.isSandbox && (
+            <ToolHint text="Collection Settings" toolhintId="CollectionSettingsToolhintId">
+              <ActionIcon onClick={viewCollectionSettings} aria-label="Collection Settings" size="sm">
+                <IconSettings size={16} strokeWidth={1.5} />
+              </ActionIcon>
+            </ToolHint>
+          )}
           {/* ToolHint is present within the JsSandboxMode component */}
           <JsSandboxMode collection={collection} />
           <span className="ml-2">

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateLeftSidebarWidth, updateIsDragging } from 'providers/ReduxStore/slices/app';
 import CollectionsSection from './Sections/CollectionsSection/index';
-import ScratchpadSection from './Sections/ScratchpadSection/index';
+import SandboxSection from './Sections/SandboxSection/index';
 import ApiSpecsSection from './Sections/ApiSpecsSection/index';
 
 const MIN_LEFT_SIDEBAR_WIDTH = 220;
@@ -18,8 +18,8 @@ const SIDEBAR_SECTIONS = [
     component: CollectionsSection
   },
   {
-    id: 'scratchpad',
-    component: ScratchpadSection
+    id: 'sandbox',
+    component: SandboxSection
   },
   {
     id: 'api-specs',
@@ -94,7 +94,7 @@ const Sidebar = () => {
   }, [leftSidebarWidth]);
 
   return (
-    <SidebarAccordionProvider defaultExpanded={['collections', 'scratchpad']}>
+    <SidebarAccordionProvider defaultExpanded={['collections', 'sandbox']}>
       <StyledWrapper className="flex relative h-full">
         <aside className="sidebar" style={{ width: currentWidth, transition: dragging ? 'none' : 'width 0.2s ease-in-out' }}>
           <div className="flex flex-row h-full w-full">

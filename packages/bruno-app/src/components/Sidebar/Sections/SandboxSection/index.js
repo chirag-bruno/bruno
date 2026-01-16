@@ -177,13 +177,6 @@ const SandboxSection = () => {
           <IconPlus size={14} stroke={1.5} aria-hidden="true" />
         </ActionIcon>
       </MenuDropdown>
-      <ActionIcon
-        onClick={handleOpenCollection}
-        aria-label="Open collection settings"
-        title="Open collection settings"
-      >
-        <IconChevronRight size={14} stroke={1.5} aria-hidden="true" />
-      </ActionIcon>
     </>
   );
 

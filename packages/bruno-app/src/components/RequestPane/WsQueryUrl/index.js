@@ -2,20 +2,20 @@ import { IconArrowRight, IconDeviceFloppy, IconPlugConnected, IconPlugConnectedX
 import classnames from 'classnames';
 import SingleLineEditor from 'components/SingleLineEditor/index';
 import { requestUrlChanged } from 'providers/ReduxStore/slices/collections';
-import { wsConnectOnly, saveRequest, saveScratchpadRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
+import { wsConnectOnly, saveRequest, saveSandboxRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
 import { useTheme } from 'providers/Theme';
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { useDispatch, useSelector } from 'react-redux';
 import { isMacOS } from 'utils/common/platform';
-import { hasRequestChanges, isScratchpadCollection } from 'utils/collections';
+import { hasRequestChanges, isSandboxCollection } from 'utils/collections';
 import { closeWsConnection, getWsConnectionStatus } from 'utils/network/index';
 import StyledWrapper from './StyledWrapper';
 import { interpolateUrl } from 'utils/url';
 import { getAllVariables } from 'utils/collections';
 import useDebounce from 'hooks/useDebounce';
 import get from 'lodash/get';
-import SaveScratchpadRequestModal from 'components/SaveScratchpadRequestModal';
+import SaveSandboxRequestModal from 'components/SaveSandboxRequestModal';
 
 const CONNECTION_STATUS = {
   CONNECTING: 'connecting',
@@ -44,7 +44,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
   // TODO: reaper, better state for connecting
   const saveShortcut = isMacOS() ? '⌘S' : 'Ctrl+S';
   const hasChanges = useMemo(() => hasRequestChanges(item), [item]);
-  const isScratchpad = isScratchpadCollection(collection);
+  const isSandbox = isSandboxCollection(collection);
 
   const [connectionStatus, setConnectionStatus] = useWsConnectionStatus(item.uid);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -103,7 +103,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
   };
 
   const onSave = (finalValue) => {
-    if (isScratchpad) {
+    if (isSandbox) {
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -111,12 +111,12 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
   };
 
   const handleSaveModalSave = useCallback(({ targetCollectionUid, targetFolderUid, requestName }) => {
-    dispatch(saveScratchpadRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
+    dispatch(saveSandboxRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
       .then(() => {
         setShowSaveModal(false);
       })
       .catch((err) => {
-        console.error('Failed to save scratchpad request:', err);
+        console.error('Failed to save sandbox request:', err);
       });
   }, [dispatch, item.uid]);
 
@@ -124,7 +124,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
   useEffect(() => {
     const handleShowSaveModal = (event) => {
       // Only show modal if this event is for the current item
-      if (event.detail && event.detail.itemUid === item.uid && isScratchpad) {
+      if (event.detail && event.detail.itemUid === item.uid && isSandbox) {
         setShowSaveModal(true);
       }
     };
@@ -133,7 +133,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
     return () => {
       window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
     };
-  }, [item.uid, isScratchpad]);
+  }, [item.uid, isSandbox]);
 
   const handleUrlChange = (value) => {
     const finalUrl = value?.trim() ?? value;
@@ -230,7 +230,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
 
       {connectionStatus === CONNECTION_STATUS.CONNECTED && <div className="connection-status-strip"></div>}
       {showSaveModal && (
-        <SaveScratchpadRequestModal
+        <SaveSandboxRequestModal
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}

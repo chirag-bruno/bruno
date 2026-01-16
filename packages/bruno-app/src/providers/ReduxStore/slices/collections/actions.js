@@ -21,7 +21,7 @@ import {
   getAllVariables,
   transformRequestToSaveToFilesystem,
   transformCollectionRootToSave,
-  isScratchpadCollection
+  isSandboxCollection
 } from 'utils/collections';
 import { uuid, waitForNextTick } from 'utils/common';
 import { cancelNetworkRequest, connectWS, sendGrpcRequest, sendNetworkRequest, sendWsRequest } from 'utils/network/index';
@@ -59,7 +59,7 @@ import {
   updateCollectionVar,
   newItem,
   newEphemeralHttpRequest,
-  removeScratchpadRequests
+  removeSandboxRequests
 } from './index';
 
 import { each } from 'lodash';
@@ -146,11 +146,11 @@ export const saveRequest = (itemUid, collectionUid, silent = false) => (dispatch
       return reject(new Error('Collection not found'));
     }
 
-    // For scratchpad requests, we need to show the picker or use saved location
+    // For sandbox requests, we need to show the picker or use saved location
     // This is handled by the component that calls saveRequest
     // We'll return a special indicator that the component should handle
-    if (isScratchpadCollection(collection)) {
-      return reject(new Error('SCRATCHPAD_SAVE_REQUIRED'));
+    if (isSandboxCollection(collection)) {
+      return reject(new Error('SANDBOX_SAVE_REQUIRED'));
     }
 
     const collectionCopy = cloneDeep(collection);
@@ -217,27 +217,27 @@ export const saveMultipleRequests = (items) => (dispatch, getState) => {
   });
 };
 
-export const saveScratchpadRequestToLocation = (requestUid, targetCollectionUid, targetFolderUid, requestName) => (dispatch, getState) => {
+export const saveSandboxRequestToLocation = (requestUid, targetCollectionUid, targetFolderUid, requestName) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const state = getState();
-    const scratchpad = findCollectionByUid(state.collections.collections, 'scratchpad');
+    const sandbox = findCollectionByUid(state.collections.collections, 'sandbox');
     const targetCollection = findCollectionByUid(state.collections.collections, targetCollectionUid);
 
-    if (!scratchpad) {
-      return reject(new Error('Scratchpad collection not found'));
+    if (!sandbox) {
+      return reject(new Error('Sandbox collection not found'));
     }
 
     if (!targetCollection) {
       return reject(new Error('Target collection not found'));
     }
 
-    if (isScratchpadCollection(targetCollection)) {
-      return reject(new Error('Cannot save to scratchpad'));
+    if (isSandboxCollection(targetCollection)) {
+      return reject(new Error('Cannot save to sandbox'));
     }
 
-    const request = findItemInCollection(scratchpad, requestUid);
+    const request = findItemInCollection(sandbox, requestUid);
     if (!request || !isItemARequest(request)) {
-      return reject(new Error('Request not found in scratchpad'));
+      return reject(new Error('Request not found in sandbox'));
     }
 
     // Get request data (use draft if exists)
@@ -293,26 +293,26 @@ export const saveScratchpadRequestToLocation = (requestUid, targetCollectionUid,
 
     const { ipcRenderer } = window;
 
-    // Get the original request pathname from scratchpad to delete it later
-    const scratchpadRequestPathname = request.pathname;
+    // Get the original request pathname from sandbox to delete it later
+    const sandboxRequestPathname = request.pathname;
 
     ipcRenderer
       .invoke('renderer:new-request', fullPathname, itemToSave)
       .then(() => {
         // Delete the request from virtual filesystem if it exists
-        // Check if it's a virtual path (scratchpad path starts with /scratchpad/)
-        if (scratchpadRequestPathname && scratchpadRequestPathname.startsWith('/scratchpad/')) {
+        // Check if it's a virtual path (sandbox path starts with /sandbox/)
+        if (sandboxRequestPathname && sandboxRequestPathname.startsWith('/sandbox/')) {
           return ipcRenderer
-            .invoke('renderer:delete-item', scratchpadRequestPathname, request.type, scratchpad.pathname)
+            .invoke('renderer:delete-item', sandboxRequestPathname, request.type, sandbox.pathname)
             .catch((err) => {
               // Log error but don't fail the save operation
-              console.error('Failed to delete scratchpad request from virtual filesystem:', err);
+              console.error('Failed to delete sandbox request from virtual filesystem:', err);
             });
         }
       })
       .then(() => {
-        // Remove from scratchpad
-        dispatch(removeScratchpadRequests({ requestUids: [requestUid] }));
+        // Remove from sandbox
+        dispatch(removeSandboxRequests({ requestUids: [requestUid] }));
 
         // Open the request in the target collection
         dispatch(
@@ -334,29 +334,29 @@ export const saveScratchpadRequestToLocation = (requestUid, targetCollectionUid,
   });
 };
 
-export const saveScratchpadRequestsToCollection = (requestUids, targetCollectionUid) => (dispatch, getState) => {
+export const saveSandboxRequestsToCollection = (requestUids, targetCollectionUid) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const state = getState();
-    const scratchpad = findCollectionByUid(state.collections.collections, 'scratchpad');
+    const sandbox = findCollectionByUid(state.collections.collections, 'sandbox');
     const targetCollection = findCollectionByUid(state.collections.collections, targetCollectionUid);
 
-    if (!scratchpad) {
-      return reject(new Error('Scratchpad collection not found'));
+    if (!sandbox) {
+      return reject(new Error('Sandbox collection not found'));
     }
 
     if (!targetCollection) {
       return reject(new Error('Target collection not found'));
     }
 
-    if (isScratchpadCollection(targetCollection)) {
-      return reject(new Error('Cannot save to scratchpad'));
+    if (isSandboxCollection(targetCollection)) {
+      return reject(new Error('Cannot save to sandbox'));
     }
 
     const requestsToSave = [];
     const requestUidsToRemove = [];
 
     each(requestUids, (requestUid) => {
-      const request = findItemInCollection(scratchpad, requestUid);
+      const request = findItemInCollection(sandbox, requestUid);
       if (request && isItemARequest(request)) {
         const requestData = request.draft ? cloneDeep(request.draft) : cloneDeep(request);
 
@@ -378,7 +378,7 @@ export const saveScratchpadRequestsToCollection = (requestUids, targetCollection
             format: targetCollection.format,
             requestUid: requestUid,
             targetCollectionUid: targetCollectionUid,
-            scratchpadPathname: request.pathname, // Store original pathname for deletion
+            sandboxPathname: request.pathname, // Store original pathname for deletion
             requestType: request.type
           });
           requestUidsToRemove.push(requestUid);
@@ -400,26 +400,26 @@ export const saveScratchpadRequestsToCollection = (requestUids, targetCollection
       .then(() => {
         // Delete all requests from virtual filesystem
         const deletePromises = requestsToSave
-          .filter((r) => r.scratchpadPathname && r.scratchpadPathname.startsWith('/scratchpad/'))
+          .filter((r) => r.sandboxPathname && r.sandboxPathname.startsWith('/sandbox/'))
           .map((r) => {
             return ipcRenderer
-              .invoke('renderer:delete-item', r.scratchpadPathname, r.requestType, scratchpad.pathname)
+              .invoke('renderer:delete-item', r.sandboxPathname, r.requestType, sandbox.pathname)
               .catch((err) => {
                 // Log error but don't fail the save operation
-                console.error(`Failed to delete scratchpad request ${r.scratchpadPathname} from virtual filesystem:`, err);
+                console.error(`Failed to delete sandbox request ${r.sandboxPathname} from virtual filesystem:`, err);
               });
           });
 
         return Promise.all(deletePromises);
       })
       .then(() => {
-        dispatch(removeScratchpadRequests({ requestUids: requestUidsToRemove }));
+        dispatch(removeSandboxRequests({ requestUids: requestUidsToRemove }));
 
         toast.success(`Saved ${requestsToSave.length} request(s) to ${targetCollection.name}`);
         resolve();
       })
       .catch((err) => {
-        toast.error('Failed to save scratchpad requests!');
+        toast.error('Failed to save sandbox requests!');
         reject(err);
       });
   });
@@ -1463,7 +1463,7 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
-    const isScratchpad = isScratchpadCollection(collection);
+    const isSandbox = isSandboxCollection(collection);
 
     const parts = splitOnFirst(requestUrl, '?');
     const queryParams = parseQueryParams(parts[1]);
@@ -1523,8 +1523,8 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
     };
     item.draft = cloneDeep(item);
 
-    if (isScratchpad && itemUid) {
-      return reject(new Error('Scratchpad does not support folders'));
+    if (isSandbox && itemUid) {
+      return reject(new Error('Sandbox does not support folders'));
     }
 
     // itemUid is null when we are creating a new request at the root level
@@ -1537,8 +1537,8 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
       item.seq = items.length + 1;
 
       if (!reqWithSameNameExists) {
-        const fullName = isScratchpad
-          ? `/scratchpad/root/${resolvedFilename}`
+        const fullName = isSandbox
+          ? `/sandbox/root/${resolvedFilename}`
           : path.join(collection.pathname, resolvedFilename);
         item.pathname = fullName;
         const { ipcRenderer } = window;
@@ -1607,7 +1607,7 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
-    const isScratchpad = isScratchpadCollection(collection);
+    const isSandbox = isSandboxCollection(collection);
     const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
     const item = {
@@ -1645,9 +1645,9 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
     };
     item.draft = cloneDeep(item);
 
-    // Scratchpad does not support folders
-    if (isScratchpad && itemUid) {
-      return reject(new Error('Scratchpad does not support folders'));
+    // Sandbox does not support folders
+    if (isSandbox && itemUid) {
+      return reject(new Error('Sandbox does not support folders'));
     }
 
     // For regular collections, use file system
@@ -1667,8 +1667,8 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
 
     const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
     item.seq = items.length + 1;
-    const fullName = isScratchpad && !itemUid
-      ? `/scratchpad/root/${resolvedFilename}`
+    const fullName = isSandbox && !itemUid
+      ? `/sandbox/root/${resolvedFilename}`
       : path.join(parentItem.pathname, resolvedFilename);
     item.pathname = fullName;
     const { ipcRenderer } = window;
@@ -1698,7 +1698,7 @@ export const newWsRequest = (params) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
-    const isScratchpad = isScratchpadCollection(collection);
+    const isSandbox = isSandboxCollection(collection);
     const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
     const item = {
@@ -1739,9 +1739,9 @@ export const newWsRequest = (params) => (dispatch, getState) => {
     };
     item.draft = cloneDeep(item);
 
-    // Scratchpad does not support folders
-    if (isScratchpad && itemUid) {
-      return reject(new Error('Scratchpad does not support folders'));
+    // Sandbox does not support folders
+    if (isSandbox && itemUid) {
+      return reject(new Error('Sandbox does not support folders'));
     }
 
     // For regular collections, use file system
@@ -1761,8 +1761,8 @@ export const newWsRequest = (params) => (dispatch, getState) => {
 
     const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
     item.seq = items.length + 1;
-    const fullName = isScratchpad && !itemUid
-      ? `/scratchpad/root/${resolvedFilename}`
+    const fullName = isSandbox && !itemUid
+      ? `/sandbox/root/${resolvedFilename}`
       : path.join(parentItem.pathname, resolvedFilename);
     item.pathname = fullName;
     const { ipcRenderer } = window;

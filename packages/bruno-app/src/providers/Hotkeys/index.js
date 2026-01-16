@@ -13,7 +13,7 @@ import {
   saveFolderRoot,
   saveCollectionSettings
 } from 'providers/ReduxStore/slices/collections/actions';
-import { findCollectionByUid, findItemInCollection, isScratchpadCollection } from 'utils/collections';
+import { findCollectionByUid, findItemInCollection, isSandboxCollection } from 'utils/collections';
 import { addTab, closeTabs, reorderTabs, switchTab } from 'providers/ReduxStore/slices/tabs';
 import { toggleSidebarCollapse } from 'providers/ReduxStore/slices/app';
 import { getKeyBindingsForActionAllOS } from './keyMappings';
@@ -54,15 +54,15 @@ export const HotkeysProvider = (props) => {
             if (activeTab.type === 'folder-settings') {
               dispatch(saveFolderRoot(collection.uid, item.uid));
             } else {
-              // Check if it's a scratchpad collection - if so, trigger modal via custom event
-              if (isScratchpadCollection(collection)) {
+              // Check if it's a sandbox collection - if so, trigger modal via custom event
+              if (isSandboxCollection(collection)) {
                 // Dispatch custom event that components can listen to
                 window.dispatchEvent(new CustomEvent('bruno:show-save-modal', { detail: { itemUid: item.uid } }));
                 return false;
               }
               dispatch(saveRequest(activeTab.uid, activeTab.collectionUid)).catch((err) => {
-                // If saveRequest fails with SCRATCHPAD_SAVE_REQUIRED, trigger modal
-                if (err.message === 'SCRATCHPAD_SAVE_REQUIRED') {
+                // If saveRequest fails with SANDBOX_SAVE_REQUIRED, trigger modal
+                if (err.message === 'SANDBOX_SAVE_REQUIRED') {
                   window.dispatchEvent(new CustomEvent('bruno:show-save-modal', { detail: { itemUid: item.uid } }));
                 }
               });

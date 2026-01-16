@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { requestUrlChanged, updateRequestMethod, updateRequestProtoPath } from 'providers/ReduxStore/slices/collections';
-import { saveRequest, generateGrpcurlCommand, saveScratchpadRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
+import { saveRequest, generateGrpcurlCommand, saveSandboxRequestToLocation } from 'providers/ReduxStore/slices/collections/actions';
 import { useTheme } from 'providers/Theme';
 import SingleLineEditor from 'components/SingleLineEditor/index';
 import { isMacOS } from 'utils/common/platform';
-import { isScratchpadCollection } from 'utils/collections';
+import { isSandboxCollection } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
-import SaveScratchpadRequestModal from 'components/SaveScratchpadRequestModal';
+import SaveSandboxRequestModal from 'components/SaveSandboxRequestModal';
 import {
   IconX,
   IconCheck,
@@ -43,7 +43,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const editorRef = useRef(null);
   const isConnectionActive = useSelector((state) => state.collections.activeConnections.includes(item.uid));
 
-  const isScratchpad = isScratchpadCollection(collection);
+  const isSandbox = isSandboxCollection(collection);
   const [grpcMethods, setGrpcMethods] = useState([]);
   const [selectedGrpcMethod, setSelectedGrpcMethod] = useState({
     path: method,
@@ -89,7 +89,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const isClientStreamingMethod = selectedGrpcMethod && selectedGrpcMethod.type && CLIENT_STREAMING_METHOD_TYPES.includes(selectedGrpcMethod.type);
 
   const onSave = () => {
-    if (isScratchpad) {
+    if (isSandbox) {
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -97,12 +97,12 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   };
 
   const handleSaveModalSave = useCallback(({ targetCollectionUid, targetFolderUid, requestName }) => {
-    dispatch(saveScratchpadRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
+    dispatch(saveSandboxRequestToLocation(item.uid, targetCollectionUid, targetFolderUid, requestName))
       .then(() => {
         setShowSaveModal(false);
       })
       .catch((err) => {
-        console.error('Failed to save scratchpad request:', err);
+        console.error('Failed to save sandbox request:', err);
       });
   }, [dispatch, item.uid]);
 
@@ -110,7 +110,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   useEffect(() => {
     const handleShowSaveModal = (event) => {
       // Only show modal if this event is for the current item
-      if (event.detail && event.detail.itemUid === item.uid && isScratchpad) {
+      if (event.detail && event.detail.itemUid === item.uid && isSandbox) {
         setShowSaveModal(true);
       }
     };
@@ -119,7 +119,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
     return () => {
       window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
     };
-  }, [item.uid, isScratchpad]);
+  }, [item.uid, isSandbox]);
 
   const onUrlChange = (value) => {
     if (!editorRef.current?.editor) return;
@@ -464,7 +464,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
       )}
 
       {showSaveModal && (
-        <SaveScratchpadRequestModal
+        <SaveSandboxRequestModal
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}

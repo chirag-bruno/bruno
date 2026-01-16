@@ -188,18 +188,18 @@ export const collectionsSlice = createSlice({
     removeCollection: (state, action) => {
       state.collections = filter(state.collections, (c) => c.uid !== action.payload.collectionUid);
     },
-    createScratchpadCollection: (state) => {
-      // Check if scratchpad already exists
-      const existingScratchpad = findCollectionByUid(state.collections, 'scratchpad');
-      if (existingScratchpad) {
+    createSandboxCollection: (state) => {
+      // Check if sandbox already exists
+      const existingSandbox = findCollectionByUid(state.collections, 'sandbox');
+      if (existingSandbox) {
         return;
       }
 
-      const scratchpad = {
-        uid: 'scratchpad',
-        name: 'Scratchpad',
-        isScratchpad: true,
-        pathname: '/scratchpad/root',
+      const sandbox = {
+        uid: 'sandbox',
+        name: 'Sandbox',
+        isSandbox: true,
+        pathname: '/sandbox/root',
         items: [],
         runtimeVariables: {},
         brunoConfig: {
@@ -220,17 +220,17 @@ export const collectionsSlice = createSlice({
           jsSandboxMode: 'safe'
         },
         root: {
-          docs: `# 🎨 Welcome to Scratchpad!
+          docs: `# 🎨 Welcome to Sandbox!
 
 Hey there! 👋 Welcome to your creative playground for API requests!
 
 ## What's This All About?
 
-Think of Scratchpad as your **digital sticky notes** for API testing! It's a super chill space where you can quickly try things out, experiment with ideas, and test endpoints without any commitment. 
+Think of Sandbox as your **digital sticky notes** for API testing! It's a super chill space where you can quickly try things out, experiment with ideas, and test endpoints without any commitment. 
 
 Just like sticky notes on your desk, these requests are here for now - perfect for when you're exploring, testing, or just playing around! 🎯
 
-## When to Use Scratchpad
+## When to Use Sandbox
 
 - 🚀 **Quick Tests**: "Hmm, I wonder if this endpoint works..." - just try it!
 - 🧪 **Experiments**: Want to test something wild? Go for it!
@@ -256,23 +256,23 @@ Now go ahead and create something amazing! 🎨✨`
         }
       };
 
-      collapseAllItemsInCollection(scratchpad);
-      addDepth(scratchpad.items);
-      state.collections.push(scratchpad);
+      collapseAllItemsInCollection(sandbox);
+      addDepth(sandbox.items);
+      state.collections.push(sandbox);
     },
-    removeScratchpadRequests: (state, action) => {
-      const scratchpad = findCollectionByUid(state.collections, 'scratchpad');
-      if (scratchpad && action.payload.requestUids) {
-        scratchpad.items = filter(scratchpad.items, (item) => !action.payload.requestUids.includes(item.uid));
+    removeSandboxRequests: (state, action) => {
+      const sandbox = findCollectionByUid(state.collections, 'sandbox');
+      if (sandbox && action.payload.requestUids) {
+        sandbox.items = filter(sandbox.items, (item) => !action.payload.requestUids.includes(item.uid));
       }
     },
     sortCollections: (state, action) => {
       state.collectionSortOrder = action.payload.order;
       const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-      // Separate scratchpad from regular collections
-      const scratchpad = findCollectionByUid(state.collections, 'scratchpad');
-      const regularCollections = state.collections.filter((c) => c.uid !== 'scratchpad');
+      // Separate sandbox from regular collections
+      const sandbox = findCollectionByUid(state.collections, 'sandbox');
+      const regularCollections = state.collections.filter((c) => c.uid !== 'sandbox');
 
       switch (action.payload.order) {
         case 'default':
@@ -286,9 +286,9 @@ Now go ahead and create something amazing! 🎨✨`
           break;
       }
 
-      // Recombine: scratchpad first, then sorted collections
-      if (scratchpad) {
-        state.collections = [scratchpad, ...regularCollections];
+      // Recombine: sandbox first, then sorted collections
+      if (sandbox) {
+        state.collections = [sandbox, ...regularCollections];
       } else {
         state.collections = regularCollections;
       }
@@ -3501,8 +3501,8 @@ Now go ahead and create something amazing! 🎨✨`
 
 export const {
   createCollection,
-  createScratchpadCollection,
-  removeScratchpadRequests,
+  createSandboxCollection,
+  removeSandboxRequests,
   updateCollectionMountStatus,
   updateCollectionLoadingState,
   setCollectionSecurityConfig,
