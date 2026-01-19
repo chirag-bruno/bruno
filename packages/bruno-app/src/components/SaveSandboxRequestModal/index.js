@@ -309,7 +309,7 @@ const SaveSandboxRequestModal = ({ onClose, onSave, request }) => {
 
         {/* Custom Footer */}
         <div className="modal-custom-footer">
-          <Button
+          {/* <Button
             type="button"
             color="primary"
             onClick={() => {
@@ -322,8 +322,8 @@ const SaveSandboxRequestModal = ({ onClose, onSave, request }) => {
           >
             <IconFolderPlus size={16} strokeWidth={1.5} />
             New Folder
-          </Button>
-          <div className="footer-right-buttons">
+          </Button> */}
+          <div className="footer-right-buttons ml-auto">
             <Button type="button" color="secondary" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
