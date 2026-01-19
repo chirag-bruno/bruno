@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import Modal from 'components/Modal/index';
 import { IconFiles, IconFolder, IconChevronRight, IconChevronDown, IconFile, IconSearch, IconDotsVertical } from '@tabler/icons';
@@ -83,6 +83,15 @@ const SaveSandboxRequestModal = ({ onClose, onSave, request }) => {
   const [requestName, setRequestName] = useState('');
   const [error, setError] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+
+  // Reset state when modal opens (on mount)
+  useEffect(() => {
+    setSelectedCollectionUid(null);
+    setSelectedFolderUid(null);
+    setRequestName('');
+    setError('');
+    setExpandedFolders(new Set());
+  }, []); // Reset on mount to ensure clean state when reopening
 
   const availableCollections = collections.filter((c) => !isSandboxCollection(c));
   const selectedCollection = selectedCollectionUid

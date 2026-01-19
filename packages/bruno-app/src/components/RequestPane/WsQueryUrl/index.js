@@ -48,6 +48,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
 
   const [connectionStatus, setConnectionStatus] = useWsConnectionStatus(item.uid);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const saveModalKeyRef = useRef(0);
   const url = item.draft ? get(item, 'draft.request.url', '') : get(item, 'request.url', '');
 
   const allVariables = useMemo(() => {
@@ -104,6 +105,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
 
   const onSave = (finalValue) => {
     if (isSandbox) {
+      saveModalKeyRef.current += 1;
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -231,6 +233,7 @@ const WsQueryUrl = ({ item, collection, handleRun }) => {
       {connectionStatus === CONNECTION_STATUS.CONNECTED && <div className="connection-status-strip"></div>}
       {showSaveModal && (
         <SaveSandboxRequestModal
+          key={`save-modal-${item.uid}-${saveModalKeyRef.current}`}
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}

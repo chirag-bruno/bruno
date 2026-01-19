@@ -38,10 +38,12 @@ const QueryUrl = ({ item, collection, handleRun }) => {
 
   const [generateCodeItemModalOpen, setGenerateCodeItemModalOpen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const saveModalKeyRef = useRef(0);
   const hasChanges = useMemo(() => hasRequestChanges(item), [item]);
 
   const onSave = () => {
     if (isSandbox) {
+      saveModalKeyRef.current += 1;
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -58,6 +60,22 @@ const QueryUrl = ({ item, collection, handleRun }) => {
         console.error('Failed to save sandbox request:', err);
       });
   }, [dispatch, item.uid]);
+
+  // Listen for global save modal trigger event (from hotkey handler)
+  useEffect(() => {
+    const handleShowSaveModal = (event) => {
+      // Only show modal if this event is for the current item
+      if (event.detail && event.detail.itemUid === item.uid && isSandbox) {
+        saveModalKeyRef.current += 1;
+        setShowSaveModal(true);
+      }
+    };
+
+    window.addEventListener('bruno:show-save-modal', handleShowSaveModal);
+    return () => {
+      window.removeEventListener('bruno:show-save-modal', handleShowSaveModal);
+    };
+  }, [item.uid, isSandbox]);
 
   const onUrlChange = (value) => {
     if (!editorRef.current?.editor) return;
@@ -467,6 +485,7 @@ const QueryUrl = ({ item, collection, handleRun }) => {
       )}
       {showSaveModal && (
         <SaveSandboxRequestModal
+          key={`save-modal-${item.uid}-${saveModalKeyRef.current}`}
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}

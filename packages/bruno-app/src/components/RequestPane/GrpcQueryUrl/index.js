@@ -55,6 +55,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
   const [grpcurlCommand, setGrpcurlCommand] = useState('');
   const [showProtoDropdown, setShowProtoDropdown] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const saveModalKeyRef = useRef(0);
 
   const methodDropdownRef = useRef(null);
   const protoDropdownRef = useRef(null);
@@ -90,6 +91,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
 
   const onSave = () => {
     if (isSandbox) {
+      saveModalKeyRef.current += 1;
       setShowSaveModal(true);
     } else {
       dispatch(saveRequest(item.uid, collection.uid));
@@ -465,6 +467,7 @@ const GrpcQueryUrl = ({ item, collection, handleRun }) => {
 
       {showSaveModal && (
         <SaveSandboxRequestModal
+          key={`save-modal-${item.uid}-${saveModalKeyRef.current}`}
           onClose={() => setShowSaveModal(false)}
           onSave={handleSaveModalSave}
           request={item}
