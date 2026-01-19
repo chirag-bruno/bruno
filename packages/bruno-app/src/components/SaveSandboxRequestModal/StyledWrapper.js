@@ -5,120 +5,91 @@ const StyledWrapper = styled.div`
     min-height: 300px;
   }
 
-  .select-input {
-    width: 100%;
+  .collection-path {
     padding: 8px 12px;
-    border: 1px solid ${(props) => props.theme.border};
-    border-radius: 4px;
-    background-color: ${(props) => props.theme.colors.background};
-    color: ${(props) => props.theme.colors.text.primary};
+    background-color: ${(props) => props.theme.input.bg};
+    border: 1px solid ${(props) => props.theme.input.border};
+    border-radius: ${(props) => props.theme.border.radius.sm};
+    min-height: 2.1rem;
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+
+  .collection-path-text {
     font-size: 14px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-
-    &:focus {
-      outline: none;
-      border-color: ${(props) => props.theme.colors.primary};
-    }
-
-    &:hover {
-      border-color: ${(props) => props.theme.colors.primary};
-    }
+    color: ${(props) => props.theme.text};
   }
 
-  .tree-container {
-    border: 1px solid ${(props) => props.theme.border};
-    border-radius: 4px;
-    background-color: ${(props) => props.theme.colors.background};
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    min-height: 200px;
-    max-height: 400px;
-  }
-
-  .tree-header {
-    padding: 10px 12px;
-    background-color: ${(props) => props.theme.plainGrid.headerBg || props.theme.colors.background};
-    border-bottom: 1px solid ${(props) => props.theme.border};
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    flex-shrink: 0;
+  .breadcrumbs {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-  }
-
-  .tree-header-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: ${(props) => props.theme.colors.text.primary};
-    flex: 1;
-  }
-
-  .tree-header-actions {
-    display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     gap: 4px;
+    padding: 8px 12px;
+    background-color: ${(props) => props.theme.input.bg};
+    border: 1px solid ${(props) => props.theme.input.border};
+    border-radius: ${(props) => props.theme.border.radius.sm};
+    min-height: 2.1rem;
   }
 
-  .tree-header-action {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
+  .breadcrumb-item {
+    background: none;
     border: none;
-    background: transparent;
-    color: ${(props) => props.theme.colors.text.secondary};
-    cursor: pointer;
-    border-radius: 3px;
-    transition: all 0.15s;
     padding: 0;
+    font-size: 14px;
+    color: ${(props) => props.theme.text};
+    cursor: pointer;
+    transition: color 0.15s;
+    text-decoration: none;
 
     &:hover {
-      background-color: ${(props) => props.theme.plainGrid.hoverBg || 'rgba(0, 0, 0, 0.05)'};
-      color: ${(props) => props.theme.colors.text.primary};
+      color: ${(props) => props.theme.colors?.primary || props.theme.primary?.solid};
+      text-decoration: underline;
     }
 
-    &:focus {
-      outline: none;
-      background-color: ${(props) => props.theme.plainGrid.hoverBg || 'rgba(0, 0, 0, 0.05)'};
+    &.active {
+      color: ${(props) => props.theme.text};
+      font-weight: 500;
+      cursor: default;
+      text-decoration: none;
+
+      &:hover {
+        color: ${(props) => props.theme.text};
+        text-decoration: none;
+      }
     }
   }
 
-  .tree-content {
+  .breadcrumb-separator {
+    color: ${(props) => props.theme.colors?.text?.secondary || props.theme.textMuted};
+    font-size: 14px;
+    user-select: none;
+  }
+
+  .folders-list {
+    border: 1px solid ${(props) => props.theme.input.border};
+    border-radius: ${(props) => props.theme.border.radius.sm};
+    background-color: ${(props) => props.theme.input.bg};
+    max-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
-    flex: 1;
-    padding: 4px;
-    min-height: 150px;
+    margin-top: 0.5rem;
   }
 
-  .tree-empty-state {
-    padding: 20px;
-    text-align: center;
-    color: ${(props) => props.theme.colors.text.secondary};
-    font-size: 13px;
-  }
-
-  .tree-item-wrapper {
-    width: 100%;
-  }
-
-  .tree-item {
-    padding: 4px 8px;
+  .folder-item {
+    padding: 8px 12px;
     cursor: pointer;
     border-radius: 3px;
     transition: background-color 0.15s;
     user-select: none;
-    min-height: 24px;
     display: flex;
     align-items: center;
+    gap: 8px;
+    min-height: 36px;
 
     &:hover {
-      background-color: ${(props) => props.theme.plainGrid.hoverBg || 'rgba(0, 0, 0, 0.05)'};
+      background-color: ${(props) => props.theme.plainGrid?.hoverBg || 'rgba(0, 0, 0, 0.05)'};
     }
 
     &.selected {
@@ -129,9 +100,8 @@ const StyledWrapper = styled.div`
         }
         return 'rgba(56, 139, 253, 0.15)';
       }};
-      color: ${(props) => props.theme.colors.text.primary};
 
-      .tree-item-label {
+      .folder-name {
         font-weight: 500;
         color: ${(props) => {
           if (props.theme.bg === '#1e1e1e' || props.theme.bg === '#0d1117') {
@@ -150,55 +120,67 @@ const StyledWrapper = styled.div`
         }};
       }
     }
-
-    &.root-item {
-      font-weight: 500;
-    }
   }
 
-  .tree-item-content {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 4px;
-  }
-
-  .tree-toggle,
-  .tree-toggle-placeholder {
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: ${(props) => props.theme.colors.text.secondary};
-  }
-
-  .tree-toggle {
-    cursor: pointer;
-    transition: color 0.15s;
-
-    &:hover {
-      color: ${(props) => props.theme.colors.text.primary};
-    }
-  }
-
-  .tree-item-label {
+  .folder-name {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 14px;
+    color: ${(props) => props.theme.text};
+  }
+
+  .chevron {
+    color: ${(props) => props.theme.colors?.text?.secondary || props.theme.textMuted};
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    padding: 20px;
+    text-align: center;
+    color: ${(props) => props.theme.colors?.text?.secondary || props.theme.textMuted};
     font-size: 13px;
   }
 
+  .empty-collections-message {
+    padding: 20px;
+    text-align: center;
+    color: ${(props) => props.theme.colors?.text?.secondary || props.theme.textMuted};
+    font-size: 14px;
+  }
+
   .error-message {
-    color: ${(props) => props.theme.colors.text.danger};
+    color: ${(props) => props.theme.colors?.text?.danger || '#ef4444'};
     font-size: 12px;
     margin-top: 8px;
     padding: 8px;
     background-color: ${(props) => (props.theme.bg === '#1e1e1e' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)')};
-    border-radius: 4px;
-    border: 1px solid ${(props) => props.theme.colors.text.danger};
+    border-radius: ${(props) => props.theme.border.radius.sm};
+    border: 1px solid ${(props) => props.theme.colors?.text?.danger || '#ef4444'};
+  }
+
+  .modal-custom-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-top: 1px solid ${(props) => props.theme.border?.border0 || props.theme.border};
+    background-color: ${(props) => props.theme.modal?.body?.bg || props.theme.colors?.background};
+    border-bottom-left-radius: ${(props) => props.theme.border?.radius?.base || '8px'};
+    border-bottom-right-radius: ${(props) => props.theme.border?.radius?.base || '8px'};
+  }
+
+  .new-folder-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .footer-right-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
   }
 `;
 
