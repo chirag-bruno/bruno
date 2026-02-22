@@ -7,11 +7,20 @@ import last from 'lodash/last';
 
 const initialState = {
   tabs: [],
-  activeTabUid: null
+  activeTabUid: null,
+  activeTabByCollection: {} // Track last active tab per collection
 };
 
 const tabTypeAlreadyExists = (tabs, collectionUid, type) => {
   return find(tabs, (tab) => tab.collectionUid === collectionUid && tab.type === type);
+};
+
+// Helper to set active tab and track it per collection
+const setActiveTab = (state, uid, collectionUid) => {
+  state.activeTabUid = uid;
+  if (collectionUid) {
+    state.activeTabByCollection[collectionUid] = uid;
+  }
 };
 
 export const tabsSlice = createSlice({
@@ -27,20 +36,19 @@ export const tabsSlice = createSlice({
         'environment-settings',
         'global-environment-settings',
         'preferences',
-        'workspaceOverview',
         'workspaceEnvironments'
       ];
 
       const existingTab = find(state.tabs, (tab) => tab.uid === uid);
       if (existingTab) {
-        state.activeTabUid = existingTab.uid;
+        setActiveTab(state, existingTab.uid, existingTab.collectionUid);
         return;
       }
 
       if (nonReplaceableTabTypes.includes(type)) {
         const existingTab = tabTypeAlreadyExists(state.tabs, collectionUid, type);
         if (existingTab) {
-          state.activeTabUid = existingTab.uid;
+          setActiveTab(state, existingTab.uid, collectionUid);
           return;
         }
       }
@@ -73,7 +81,7 @@ export const tabsSlice = createSlice({
           ...(itemUid ? { itemUid } : {})
         };
 
-        state.activeTabUid = uid;
+        setActiveTab(state, uid, collectionUid);
         return;
       }
 
@@ -95,13 +103,35 @@ export const tabsSlice = createSlice({
         ...(exampleUid ? { exampleUid } : {}),
         ...(itemUid ? { itemUid } : {})
       });
-      state.activeTabUid = uid;
+      setActiveTab(state, uid, collectionUid);
     },
     focusTab: (state, action) => {
       const { uid } = action.payload;
-      const tabExists = state.tabs.some((t) => t.uid === uid);
-      if (tabExists) {
-        state.activeTabUid = uid;
+      const tab = state.tabs.find((t) => t.uid === uid);
+      if (tab) {
+        setActiveTab(state, uid, tab.collectionUid);
+      }
+    },
+    focusCollection: (state, action) => {
+      const { collectionUid } = action.payload;
+
+      // First, try to focus the last active tab for this collection
+      const lastActiveTabUid = state.activeTabByCollection[collectionUid];
+      if (lastActiveTabUid) {
+        const lastActiveTab = state.tabs.find((t) => t.uid === lastActiveTabUid);
+        if (lastActiveTab) {
+          state.activeTabUid = lastActiveTabUid;
+          return;
+        }
+      }
+
+      // Fall back to any existing tab for this collection
+      const existingTab = state.tabs.find((t) => t.collectionUid === collectionUid);
+      if (existingTab) {
+        setActiveTab(state, existingTab.uid, collectionUid);
+      } else {
+        // No tabs for this collection - clear active tab to show empty state
+        state.activeTabUid = null;
       }
     },
     switchTab: (state, action) => {
@@ -111,9 +141,7 @@ export const tabsSlice = createSlice({
       }
 
       const direction = action.payload.direction;
-
       const activeTabIndex = state.tabs.findIndex((t) => t.uid === state.activeTabUid);
-
       let toBeActivatedTabIndex = 0;
 
       if (direction == 'pageup') {
@@ -122,7 +150,8 @@ export const tabsSlice = createSlice({
         toBeActivatedTabIndex = (activeTabIndex + 1) % state.tabs.length;
       }
 
-      state.activeTabUid = state.tabs[toBeActivatedTabIndex].uid;
+      const newActiveTab = state.tabs[toBeActivatedTabIndex];
+      setActiveTab(state, newActiveTab.uid, newActiveTab.collectionUid);
     },
     updateRequestPaneTabWidth: (state, action) => {
       const tab = find(state.tabs, (t) => t.uid === action.payload.uid);
@@ -184,10 +213,21 @@ export const tabsSlice = createSlice({
       const activeTab = find(state.tabs, (t) => t.uid === state.activeTabUid);
       const tabUids = action.payload.tabUids || [];
 
-      const nonClosableTypes = ['workspaceOverview', 'workspaceEnvironments'];
-      state.tabs = filter(state.tabs, (t) =>
-        !tabUids.includes(t.uid) || nonClosableTypes.includes(t.type)
-      );
+      state.tabs = filter(state.tabs, (t) => !tabUids.includes(t.uid));
+
+      // Clean up activeTabByCollection for closed tabs
+      for (const collectionUid in state.activeTabByCollection) {
+        const trackedTabUid = state.activeTabByCollection[collectionUid];
+        if (tabUids.includes(trackedTabUid)) {
+          // Find another tab for this collection to track, or remove the entry
+          const remainingTab = state.tabs.find((t) => t.collectionUid === collectionUid);
+          if (remainingTab) {
+            state.activeTabByCollection[collectionUid] = remainingTab.uid;
+          } else {
+            delete state.activeTabByCollection[collectionUid];
+          }
+        }
+      }
 
       if (activeTab && state.tabs.length) {
         const { collectionUid } = activeTab;
@@ -202,9 +242,10 @@ export const tabsSlice = createSlice({
           // if there are sibling tabs, set the active tab to the last sibling tab
           // otherwise, set the active tab to the last tab in the list
           if (siblingTabs && siblingTabs.length) {
-            state.activeTabUid = last(siblingTabs).uid;
+            setActiveTab(state, last(siblingTabs).uid, collectionUid);
           } else {
-            state.activeTabUid = last(state.tabs).uid;
+            const newActiveTab = last(state.tabs);
+            setActiveTab(state, newActiveTab.uid, newActiveTab.collectionUid);
           }
         }
       }
@@ -218,9 +259,17 @@ export const tabsSlice = createSlice({
       const prevActiveTabUid = state.activeTabUid;
       state.tabs = filter(state.tabs, (t) => t.collectionUid !== collectionUid);
 
+      // Remove the collection from activeTabByCollection
+      delete state.activeTabByCollection[collectionUid];
+
       const activeTabStillExists = state.tabs.some((t) => t.uid === prevActiveTabUid);
       if (!activeTabStillExists) {
-        state.activeTabUid = state.tabs.length > 0 ? last(state.tabs).uid : null;
+        if (state.tabs.length > 0) {
+          const newActiveTab = last(state.tabs);
+          setActiveTab(state, newActiveTab.uid, newActiveTab.collectionUid);
+        } else {
+          state.activeTabUid = null;
+        }
       }
     },
     makeTabPermanent: (state, action) => {
@@ -265,6 +314,7 @@ export const tabsSlice = createSlice({
 export const {
   addTab,
   focusTab,
+  focusCollection,
   switchTab,
   updateRequestPaneTabWidth,
   updateRequestPaneTabHeight,

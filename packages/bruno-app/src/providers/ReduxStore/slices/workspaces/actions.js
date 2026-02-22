@@ -13,7 +13,6 @@ import { showHomePage } from '../app';
 import { createCollection, openCollection, openMultipleCollections, openScratchCollectionEvent } from '../collections/actions';
 import { removeCollection, addTransientDirectory, updateCollectionMountStatus } from '../collections';
 import { updateGlobalEnvironments } from '../global-environments';
-import { addTab, focusTab } from '../tabs';
 import { normalizePath } from 'utils/common/path';
 import toast from 'react-hot-toast';
 
@@ -263,29 +262,8 @@ export const switchWorkspace = (workspaceUid) => {
       dispatch(updateGlobalEnvironments({ globalEnvironments: [], activeGlobalEnvironmentUid: null }));
     }
 
-    const scratchCollection = await dispatch(mountScratchCollection(workspaceUid));
+    await dispatch(mountScratchCollection(workspaceUid));
     await loadWorkspaceCollectionsForSwitch(dispatch, workspace);
-
-    if (scratchCollection?.uid) {
-      const overviewTabUid = `${scratchCollection.uid}-overview`;
-      const environmentsTabUid = `${scratchCollection.uid}-environments`;
-
-      dispatch(addTab({
-        uid: overviewTabUid,
-        collectionUid: scratchCollection.uid,
-        type: 'workspaceOverview'
-      }));
-
-      dispatch(addTab({
-        uid: environmentsTabUid,
-        collectionUid: scratchCollection.uid,
-        type: 'workspaceEnvironments'
-      }));
-
-      dispatch(focusTab({
-        uid: overviewTabUid
-      }));
-    }
   };
 };
 

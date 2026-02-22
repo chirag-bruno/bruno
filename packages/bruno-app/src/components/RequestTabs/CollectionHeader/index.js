@@ -12,11 +12,12 @@ import {
   IconX,
   IconCheck,
   IconFolder,
-  IconUpload
+  IconUpload,
+  IconWorld
 } from '@tabler/icons';
 import { switchWorkspace, renameWorkspaceAction, exportWorkspaceAction } from 'providers/ReduxStore/slices/workspaces/actions';
 import { showInFolder } from 'providers/ReduxStore/slices/collections/actions';
-import { addTab, focusTab } from 'providers/ReduxStore/slices/tabs';
+import { addTab, focusCollection } from 'providers/ReduxStore/slices/tabs';
 import { uuid } from 'utils/common';
 import toast from 'react-hot-toast';
 import Dropdown from 'components/Dropdown';
@@ -110,8 +111,18 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
   // Switcher handlers
   const handleSwitchToWorkspace = (workspaceUid) => {
     switcherRef.current?.hide();
-    if (workspaceUid) {
+    if (!workspaceUid) return;
+
+    // If switching to a different workspace, call switchWorkspace
+    if (workspaceUid !== activeWorkspaceUid) {
       dispatch(switchWorkspace(workspaceUid));
+      return;
+    }
+
+    // If clicking on current workspace, focus on scratch collection
+    const scratchCollectionUid = currentWorkspace?.scratchCollectionUid;
+    if (scratchCollectionUid) {
+      dispatch(focusCollection({ collectionUid: scratchCollectionUid }));
     }
   };
 
@@ -119,10 +130,13 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
     switcherRef.current?.hide();
     if (!targetCollection?.uid) return;
 
-    const existingTab = tabs.find((t) => t.collectionUid === targetCollection.uid);
-    if (existingTab) {
-      dispatch(focusTab({ uid: existingTab.uid }));
+    // Check if any tabs exist for this collection
+    const hasExistingTabs = tabs.some((t) => t.collectionUid === targetCollection.uid);
+    if (hasExistingTabs) {
+      // Use focusCollection to respect last active tab
+      dispatch(focusCollection({ collectionUid: targetCollection.uid }));
     } else {
+      // No tabs exist, open collection settings
       dispatch(
         addTab({
           uid: targetCollection.uid,
@@ -160,6 +174,18 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
         uid: collection.uid,
         collectionUid: collection.uid,
         type: 'collection-settings'
+      })
+    );
+  };
+
+  // Workspace environments handler (for scratch collection)
+  const handleOpenEnvironments = () => {
+    const environmentsTabUid = `${collection.uid}-environments`;
+    dispatch(
+      addTab({
+        uid: environmentsTabUid,
+        collectionUid: collection.uid,
+        type: 'workspaceEnvironments'
       })
     );
   };
@@ -420,8 +446,16 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
           )}
         </div>
 
-        {/* Right side: Actions (only for regular collections) */}
-        {!isScratchCollection && (
+        {/* Right side: Actions */}
+        {isScratchCollection ? (
+          <div className="flex flex-grow gap-1 items-center justify-end">
+            <ToolHint text="Environments" toolhintId="EnvironmentsToolhintId">
+              <ActionIcon onClick={handleOpenEnvironments} aria-label="Environments" size="sm">
+                <IconWorld size={16} strokeWidth={1.5} />
+              </ActionIcon>
+            </ToolHint>
+          </div>
+        ) : (
           <div className="flex flex-grow gap-1 items-center justify-end">
             <ToolHint text="Runner" toolhintId="RunnerToolhintId" place="bottom">
               <ActionIcon onClick={handleRun} aria-label="Runner" size="sm">

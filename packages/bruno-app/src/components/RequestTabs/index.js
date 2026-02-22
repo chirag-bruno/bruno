@@ -8,6 +8,7 @@ import { focusTab, reorderTabs } from 'providers/ReduxStore/slices/tabs';
 import NewRequest from 'components/Sidebar/NewRequest';
 import CollectionHeader from './CollectionHeader';
 import RequestTab from './RequestTab';
+import ScratchEmptyState from './ScratchEmptyState';
 import StyledWrapper from './StyledWrapper';
 import DraggableTab from './DraggableTab';
 import CreateTransientRequest from 'components/CreateTransientRequest';
@@ -28,6 +29,7 @@ const RequestTabs = () => {
   const sidebarCollapsed = useSelector((state) => state.app.sidebarCollapsed);
   const screenWidth = useSelector((state) => state.app.screenWidth);
   const workspaces = useSelector((state) => state.workspaces.workspaces);
+  const activeWorkspaceUid = useSelector((state) => state.workspaces.activeWorkspaceUid);
 
   const createSetHasOverflow = useCallback((tabUid) => {
     return (hasOverflow) => {
@@ -50,6 +52,15 @@ const RequestTabs = () => {
   const isScratchCollection = useMemo(() => {
     return activeCollection ? workspaces.some((w) => w.scratchCollectionUid === activeCollection.uid) : false;
   }, [workspaces, activeCollection]);
+
+  const scratchCollectionUid = useMemo(() => {
+    const workspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
+    return workspace?.scratchCollectionUid;
+  }, [workspaces, activeWorkspaceUid]);
+
+  const scratchCollection = useMemo(() => {
+    return collections.find((c) => c.uid === scratchCollectionUid);
+  }, [collections, scratchCollectionUid]);
 
   useEffect(() => {
     if (!activeTabUid || !activeTab) return;
@@ -87,7 +98,17 @@ const RequestTabs = () => {
   };
 
   if (!activeTabUid) {
-    return null;
+    return (
+      <StyledWrapper className="h-full">
+        {scratchCollection && (
+          <CollectionHeader
+            collection={scratchCollection}
+            isScratchCollection={true}
+          />
+        )}
+        <ScratchEmptyState scratchCollectionUid={scratchCollectionUid} />
+      </StyledWrapper>
+    );
   }
 
   const effectiveSidebarWidth = sidebarCollapsed ? 0 : leftSidebarWidth;

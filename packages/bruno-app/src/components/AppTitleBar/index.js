@@ -8,7 +8,7 @@ import { savePreferences, showManageWorkspacePage, toggleSidebarCollapse } from 
 import { closeConsole, openConsole } from 'providers/ReduxStore/slices/logs';
 import { openWorkspaceDialog, switchWorkspace } from 'providers/ReduxStore/slices/workspaces/actions';
 import { sortWorkspaces, toggleWorkspacePin } from 'utils/workspaces';
-import { focusTab } from 'providers/ReduxStore/slices/tabs';
+import { focusCollection } from 'providers/ReduxStore/slices/tabs';
 
 import Bruno from 'components/Bruno';
 import MenuDropdown from 'ui/MenuDropdown';
@@ -132,7 +132,7 @@ const AppTitleBar = () => {
   const handleHomeClick = () => {
     const scratchCollectionUid = activeWorkspace?.scratchCollectionUid;
     if (scratchCollectionUid) {
-      dispatch(focusTab({ uid: `${scratchCollectionUid}-overview` }));
+      dispatch(focusCollection({ collectionUid: scratchCollectionUid }));
     }
   };
 
