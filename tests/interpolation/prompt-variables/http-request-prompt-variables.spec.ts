@@ -1,4 +1,4 @@
-import { test, expect } from '../../../playwright';
+import { test, expect, Locator } from '../../../playwright';
 import { closeAllCollections } from '../../utils/page';
 
 test.describe('Prompt Variables Interpolation', () => {
@@ -9,8 +9,8 @@ test.describe('Prompt Variables Interpolation', () => {
 
   // without client certificate - no HTTPS
   test('Verifying if the prompt variables are prompted correctly for the http request - without client certificate', async ({ pageWithUserData: page }) => {
-    let promptVariablesModal;
-    let promptInputs;
+    let promptVariablesModal: Locator;
+    let promptInputs: Locator;
 
     await test.step('Open collection and navigate to the http request with prompt variables', async () => {
       // Open collection and accept sandbox mode
@@ -32,6 +32,7 @@ test.describe('Prompt Variables Interpolation', () => {
     await test.step('Verify duplicate prompt variables are not allowed', async () => {
       // Enter the prompt variables
       promptInputs = promptVariablesModal.getByTestId('prompt-variable-input-container');
+      await page.pause();
       await expect(promptInputs).toHaveCount(12);
     });
 
@@ -80,8 +81,8 @@ test.describe('Prompt Variables Interpolation', () => {
 
   // with client certificate - HTTPS
   test('Verifying if the prompt variables are prompted correctly for the http request - with client certificate', async ({ pageWithUserData: page }) => {
-    let promptVariablesModal;
-    let promptInputs;
+    let promptVariablesModal: Locator;
+    let promptInputs: Locator;
 
     await test.step('Open collection and navigate to the http request with prompt variables', async () => {
       // Open collection and accept sandbox mode
