@@ -32,7 +32,6 @@ test.describe('Prompt Variables Interpolation', () => {
     await test.step('Verify duplicate prompt variables are not allowed', async () => {
       // Enter the prompt variables
       promptInputs = promptVariablesModal.getByTestId('prompt-variable-input-container');
-      await page.pause();
       await expect(promptInputs).toHaveCount(12);
     });
 
