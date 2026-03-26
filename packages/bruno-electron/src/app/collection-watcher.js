@@ -734,7 +734,7 @@ class CollectionWatcher {
 
     setTimeout(() => {
       const watcher = chokidar.watch(watchPath, {
-        ignoreInitial: false,
+        ignoreInitial: true,
         usePolling: isWSLPath(watchPath) || forcePolling ? true : false,
         ignored: (filepath) => {
           const normalizedPath = normalizeAndResolvePath(filepath);

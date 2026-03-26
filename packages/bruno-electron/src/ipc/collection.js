@@ -2078,6 +2078,12 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
       root
     });
 
+    // Start watcher with ignoreInitial: true for live changes after mount
+    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, false);
+
+    // Add watcher for transient directory
+    watcher.addTempDirectoryWatcher(mainWindow, tempDirectoryPath, collectionUid, collectionPathname);
+
     return tempDirectoryPath;
   });
 
