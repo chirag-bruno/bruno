@@ -211,6 +211,19 @@ export const collectionsSlice = createSlice({
         collection.isLoading = action.payload.isLoading;
       }
     },
+    collectionTreeLoaded: (state, action) => {
+      const { collectionUid, items, environments, root } = action.payload;
+      const collection = findCollectionByUid(state.collections, collectionUid);
+      if (collection) {
+        collection.items = items || [];
+        collection.environments = environments || [];
+        if (root) {
+          collection.root = root;
+        }
+        addDepth(collection.items);
+        collection.isLoading = false;
+      }
+    },
     setCollectionSecurityConfig: (state, action) => {
       const collection = findCollectionByUid(state.collections, action.payload.collectionUid);
       if (collection) {
@@ -3583,6 +3596,7 @@ export const {
   createCollection,
   updateCollectionMountStatus,
   updateCollectionLoadingState,
+  collectionTreeLoaded,
   setCollectionSecurityConfig,
   brunoConfigUpdateEvent,
   renameCollection,

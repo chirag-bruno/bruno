@@ -35,7 +35,7 @@ import toast from 'react-hot-toast';
 import { useDispatch, useStore } from 'react-redux';
 import { isElectron } from 'utils/common/platform';
 import { globalEnvironmentsUpdateEvent, updateGlobalEnvironments } from 'providers/ReduxStore/slices/global-environments';
-import { collectionAddOauth2CredentialsByUrl, collectionClearOauth2CredentialsByCredentialsId, updateCollectionLoadingState } from 'providers/ReduxStore/slices/collections/index';
+import { collectionAddOauth2CredentialsByUrl, collectionClearOauth2CredentialsByCredentialsId, updateCollectionLoadingState, collectionTreeLoaded } from 'providers/ReduxStore/slices/collections/index';
 import { addLog } from 'providers/ReduxStore/slices/logs';
 import { updateSystemResources } from 'providers/ReduxStore/slices/performance';
 import { apiSpecAddFileEvent, apiSpecChangeFileEvent } from 'providers/ReduxStore/slices/apiSpec';
@@ -117,6 +117,10 @@ const useIpcEvents = () => {
     ipcRenderer.invoke('renderer:ready');
 
     const removeCollectionTreeUpdateListener = ipcRenderer.on('main:collection-tree-updated', _collectionTreeUpdated);
+
+    const removeCollectionTreeLoadedListener = ipcRenderer.on('main:collection-tree-loaded', (payload) => {
+      dispatch(collectionTreeLoaded(payload));
+    });
 
     const removeApiSpecTreeUpdateListener = ipcRenderer.on('main:apispec-tree-updated', _apiSpecTreeUpdated);
 
@@ -340,6 +344,7 @@ const useIpcEvents = () => {
 
     return () => {
       removeCollectionTreeUpdateListener();
+      removeCollectionTreeLoadedListener();
       removeApiSpecTreeUpdateListener();
       removeOpenCollectionListener();
       removeOpenWorkspaceListener();

@@ -72,6 +72,7 @@ const { getOAuth2TokenUsingAuthorizationCode, getOAuth2TokenUsingClientCredentia
 const { getCertsAndProxyConfig } = require('./network/cert-utils');
 const collectionWatcher = require('../app/collection-watcher');
 const { snap } = require('@usebruno/snap');
+const { buildCollectionTree, patchCollectionTree } = require('../app/collection-tree-builder');
 const { transformBrunoConfigBeforeSave } = require('../utils/transformBrunoConfig');
 const { REQUEST_TYPES } = require('../utils/constants');
 const { cancelOAuth2AuthorizationRequest, isOauth2AuthorizationRequestInProgress } = require('../utils/oauth2-protocol-handler');
@@ -85,6 +86,30 @@ const uiStateSnapshotStore = new UiStateSnapshotStore();
 // Get the snap.json file path for a collection
 const getSnapFilePath = (collectionUid) => {
   return path.join(app.getPath('userData'), 'snap', collectionUid, 'snap.json');
+};
+
+// Get the tree cache file path for a collection
+const getTreeCachePath = (collectionUid) => {
+  return path.join(app.getPath('userData'), 'snap', collectionUid, 'tree-cache.json');
+};
+
+const readTreeCache = (cachePath) => {
+  try {
+    const raw = fs.readFileSync(cachePath, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const writeTreeCache = (cachePath, tree) => {
+  try {
+    const cacheDir = path.dirname(cachePath);
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify(tree), 'utf-8');
+  } catch (error) {
+    console.error('[snap] failed to write tree cache:', error);
+  }
 };
 
 // size and file count limits to determine whether the bru files in the collection should be loaded asynchronously or not.
@@ -2001,24 +2026,57 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
     const snapStatus = snap.status(collectionPathname, snapFilePath, ignores);
     const snapDuration = performance.now() - snapStartTime;
     console.log(`[snap] status for collection: ${collectionUid} (${snapDuration.toFixed(2)}ms)`, snapStatus);
+
     // Save the current snapshot
-    // snap.add(collectionPathname, snapFilePath, ignores);
+    snap.add(collectionPathname, snapFilePath, ignores);
 
-    const {
-      size,
-      filesCount,
-      maxFileSize
-    } = await getCollectionStats(collectionPathname);
+    const treeCachePath = getTreeCachePath(collectionUid);
+    const cachedTree = readTreeCache(treeCachePath);
+    const hasChanges = snapStatus.added.length > 0 || snapStatus.modified.length > 0 || snapStatus.deleted.length > 0;
 
-    const shouldLoadCollectionAsync
-      = (size > MAX_COLLECTION_SIZE_IN_MB)
-        || (filesCount > MAX_COLLECTION_FILES_COUNT)
-        || (maxFileSize > MAX_SINGLE_FILE_SIZE_IN_COLLECTION_IN_MB);
+    let items, environments, root;
 
-    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, shouldLoadCollectionAsync, snapStatus);
+    if (cachedTree && !hasChanges) {
+      // No changes since last mount — use cached tree directly
+      const cacheLoadStart = performance.now();
+      items = cachedTree.items;
+      environments = cachedTree.environments;
+      root = cachedTree.root;
+      const cacheLoadDuration = performance.now() - cacheLoadStart;
+      console.log(`[snap] cache hit for collection: ${collectionUid} (${cacheLoadDuration.toFixed(2)}ms) - ${items.length} top-level items, ${environments.length} environments`);
+    } else if (cachedTree && hasChanges) {
+      // Cache exists but files changed — patch the cached tree
+      const patchStart = performance.now();
+      const changedCount = snapStatus.added.length + snapStatus.modified.length + snapStatus.deleted.length;
+      const patched = await patchCollectionTree(cachedTree, collectionPathname, collectionUid, brunoConfig, snapStatus);
+      items = patched.items;
+      environments = patched.environments;
+      root = patched.root;
+      const patchDuration = performance.now() - patchStart;
+      console.log(`[snap] cache patch for collection: ${collectionUid} (${patchDuration.toFixed(2)}ms) - ${changedCount} files changed`);
 
-    // Add watcher for transient directory
-    watcher.addTempDirectoryWatcher(mainWindow, tempDirectoryPath, collectionUid, collectionPathname);
+      // Update tree cache
+      writeTreeCache(treeCachePath, { items, environments, root });
+    } else {
+      // No cache at all — full rebuild
+      const treeBuildStart = performance.now();
+      const tree = await buildCollectionTree(collectionPathname, collectionUid, brunoConfig);
+      items = tree.items;
+      environments = tree.environments;
+      root = tree.root;
+      const treeBuildDuration = performance.now() - treeBuildStart;
+      console.log(`[snap] tree build for collection: ${collectionUid} (${treeBuildDuration.toFixed(2)}ms) - ${items.length} top-level items, ${environments.length} environments`);
+
+      // Save tree cache for next mount
+      writeTreeCache(treeCachePath, { items, environments, root });
+    }
+
+    mainWindow.webContents.send('main:collection-tree-loaded', {
+      collectionUid,
+      items,
+      environments,
+      root
+    });
 
     return tempDirectoryPath;
   });
