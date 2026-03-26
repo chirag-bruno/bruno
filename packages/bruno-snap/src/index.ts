@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { Snapshot, SnapStatus } from './types';
 
 export { Snapshot, SnapStatus, FileEntry } from './types';
@@ -7,9 +8,14 @@ export { Snapshot, SnapStatus, FileEntry } from './types';
 const DEFAULT_IGNORES = ['node_modules', '.git'];
 const MAX_DEPTH = 20;
 
+function hashFile(filePath: string): string {
+  const content = fs.readFileSync(filePath);
+  return crypto.createHash('md5').update(content).digest('hex');
+}
+
 /**
  * Recursively walk a directory and build a snapshot of all files.
- * Returns a map of absolute file paths to their mtime and size.
+ * Returns a map of absolute file paths to their size and content hash.
  */
 function walkDirectory(dirPath: string, ignores: string[], depth: number = 0): Snapshot {
   if (depth > MAX_DEPTH) {
@@ -40,7 +46,7 @@ function walkDirectory(dirPath: string, ignores: string[], depth: number = 0): S
         const stat = fs.statSync(fullPath);
         snapshot[fullPath] = {
           mtime: stat.mtimeMs,
-          size: stat.size
+          hash: hashFile(fullPath)
         };
       } catch {
         // File may have been deleted between readdir and stat
@@ -52,18 +58,17 @@ function walkDirectory(dirPath: string, ignores: string[], depth: number = 0): S
 }
 
 /**
- * Initialize a snap.json for the given collection path.
- * Walks the entire directory tree and writes the snapshot.
+ * Create an empty snap.json file for a collection.
+ * This establishes the baseline — status() will compare against this empty snapshot.
  */
-function init(collectionPath: string, snapFilePath: string, ignores: string[] = []): Snapshot {
-  const allIgnores = [...DEFAULT_IGNORES, ...ignores];
-  const snapshot = walkDirectory(collectionPath, allIgnores);
-
-  const snapDir = path.dirname(snapFilePath);
-  fs.mkdirSync(snapDir, { recursive: true });
-  fs.writeFileSync(snapFilePath, JSON.stringify(snapshot, null, 2), 'utf-8');
-
-  return snapshot;
+function init(snapFilePath: string): void {
+  try {
+    const snapDir = path.dirname(snapFilePath);
+    fs.mkdirSync(snapDir, { recursive: true });
+    fs.writeFileSync(snapFilePath, JSON.stringify({}, null, 2), 'utf-8');
+  } catch (error) {
+    throw new Error(`Failed to initialize snap: ${error}`);
+  }
 }
 
 /**
@@ -71,47 +76,60 @@ function init(collectionPath: string, snapFilePath: string, ignores: string[] = 
  * Returns lists of added, modified, and deleted file paths.
  */
 function status(collectionPath: string, snapFilePath: string, ignores: string[] = []): SnapStatus {
-  const allIgnores = [...DEFAULT_IGNORES, ...ignores];
-  const currentSnapshot = walkDirectory(collectionPath, allIgnores);
-
-  let previousSnapshot: Snapshot = {};
   try {
-    const raw = fs.readFileSync(snapFilePath, 'utf-8');
-    previousSnapshot = JSON.parse(raw);
-  } catch {
-    // No previous snapshot — everything is added
-  }
+    const allIgnores = [...DEFAULT_IGNORES, ...ignores];
+    const currentSnapshot = walkDirectory(collectionPath, allIgnores);
 
-  const added: string[] = [];
-  const modified: string[] = [];
-  const deleted: string[] = [];
-
-  // Check current files against previous snapshot
-  for (const filePath of Object.keys(currentSnapshot)) {
-    const prev = previousSnapshot[filePath];
-    if (!prev) {
-      added.push(filePath);
-    } else if (prev.mtime !== currentSnapshot[filePath].mtime || prev.size !== currentSnapshot[filePath].size) {
-      modified.push(filePath);
+    let previousSnapshot: Snapshot = {};
+    try {
+      const raw = fs.readFileSync(snapFilePath, 'utf-8');
+      previousSnapshot = JSON.parse(raw);
+    } catch {
+      // No previous snapshot — everything is added
     }
-  }
 
-  // Check for deleted files
-  for (const filePath of Object.keys(previousSnapshot)) {
-    if (!currentSnapshot[filePath]) {
-      deleted.push(filePath);
+    const added: string[] = [];
+    const modified: string[] = [];
+    const deleted: string[] = [];
+
+    // Check current files against previous snapshot
+    for (const filePath of Object.keys(currentSnapshot)) {
+      const prev = previousSnapshot[filePath];
+      if (!prev) {
+        added.push(filePath);
+      } else if (prev.mtime !== currentSnapshot[filePath].mtime || prev.hash !== currentSnapshot[filePath].hash) {
+        modified.push(filePath);
+      }
     }
-  }
 
-  return { added, modified, deleted };
+    // Check for deleted files
+    for (const filePath of Object.keys(previousSnapshot)) {
+      if (!currentSnapshot[filePath]) {
+        deleted.push(filePath);
+      }
+    }
+
+    return { added, modified, deleted };
+  } catch (error) {
+    throw new Error(`Failed to get snap status: ${error}`);
+  }
 }
 
 /**
  * Save the current filesystem state as the new snapshot.
  * This is equivalent to "committing" the current state.
  */
-function add(collectionPath: string, snapFilePath: string, ignores: string[] = []): Snapshot {
-  return init(collectionPath, snapFilePath, ignores);
+function add(collectionPath: string, snapFilePath: string, ignores: string[] = []): void {
+  try {
+    const allIgnores = [...DEFAULT_IGNORES, ...ignores];
+    const snapshot = walkDirectory(collectionPath, allIgnores);
+
+    const snapDir = path.dirname(snapFilePath);
+    fs.mkdirSync(snapDir, { recursive: true });
+    fs.writeFileSync(snapFilePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+  } catch (error) {
+    throw new Error(`Failed to add snap: ${error}`);
+  }
 }
 
 export const snap = { init, status, add };

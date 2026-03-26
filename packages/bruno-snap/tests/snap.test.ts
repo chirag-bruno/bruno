@@ -35,61 +35,38 @@ describe('snap', () => {
   });
 
   describe('init', () => {
-    it('should create snap.json with all files', () => {
-      writeFile(collectionDir, 'request.bru', 'get { url: https://example.com }');
-      writeFile(collectionDir, 'subfolder/nested.bru', 'post { url: https://example.com }');
+    it('should create an empty snap.json file', () => {
+      snap.init(snapFilePath);
 
-      const snapshot = snap.init(collectionDir, snapFilePath);
-
-      const paths = Object.keys(snapshot);
-      expect(paths).toHaveLength(2);
-      expect(paths.some(p => p.endsWith('request.bru'))).toBe(true);
-      expect(paths.some(p => p.endsWith('nested.bru'))).toBe(true);
-
-      // Verify snap.json was written
       expect(fs.existsSync(snapFilePath)).toBe(true);
-      const written = JSON.parse(fs.readFileSync(snapFilePath, 'utf-8'));
-      expect(Object.keys(written)).toHaveLength(2);
+      const content = JSON.parse(fs.readFileSync(snapFilePath, 'utf-8'));
+      expect(content).toEqual({});
     });
 
-    it('should ignore node_modules and .git by default', () => {
-      writeFile(collectionDir, 'request.bru', 'content');
-      writeFile(collectionDir, 'node_modules/pkg/index.js', 'module');
-      writeFile(collectionDir, '.git/config', 'gitconfig');
+    it('should create parent directories if they do not exist', () => {
+      const nestedPath = path.join(snapDir, 'nested', 'deep', 'snap.json');
 
-      const snapshot = snap.init(collectionDir, snapFilePath);
+      snap.init(nestedPath);
 
-      expect(Object.keys(snapshot)).toHaveLength(1);
-      expect(Object.keys(snapshot)[0]).toContain('request.bru');
-    });
-
-    it('should respect custom ignores', () => {
-      writeFile(collectionDir, 'request.bru', 'content');
-      writeFile(collectionDir, 'temp/draft.bru', 'draft');
-
-      const snapshot = snap.init(collectionDir, snapFilePath, ['temp']);
-
-      expect(Object.keys(snapshot)).toHaveLength(1);
-    });
-
-    it('should store mtime and size for each file', () => {
-      const content = 'get { url: https://example.com }';
-      writeFile(collectionDir, 'request.bru', content);
-
-      const snapshot = snap.init(collectionDir, snapFilePath);
-      const entry = Object.values(snapshot)[0];
-
-      expect(entry).toHaveProperty('mtime');
-      expect(entry).toHaveProperty('size');
-      expect(typeof entry.mtime).toBe('number');
-      expect(entry.size).toBe(Buffer.byteLength(content));
+      expect(fs.existsSync(nestedPath)).toBe(true);
     });
   });
 
   describe('status', () => {
-    it('should detect added files', () => {
+    it('should show all files as added after init', () => {
+      writeFile(collectionDir, 'request.bru', 'content');
+      writeFile(collectionDir, 'subfolder/nested.bru', 'content');
+      snap.init(snapFilePath);
+
+      const result = snap.status(collectionDir, snapFilePath);
+      expect(result.added).toHaveLength(2);
+      expect(result.modified).toHaveLength(0);
+      expect(result.deleted).toHaveLength(0);
+    });
+
+    it('should detect added files after add', () => {
       writeFile(collectionDir, 'existing.bru', 'content');
-      snap.init(collectionDir, snapFilePath);
+      snap.add(collectionDir, snapFilePath);
 
       writeFile(collectionDir, 'new-request.bru', 'new content');
 
@@ -102,9 +79,8 @@ describe('snap', () => {
 
     it('should detect modified files', (done) => {
       const filePath = writeFile(collectionDir, 'request.bru', 'original');
-      snap.init(collectionDir, snapFilePath);
+      snap.add(collectionDir, snapFilePath);
 
-      // Need a small delay so mtime changes
       setTimeout(() => {
         fs.writeFileSync(filePath, 'modified content');
 
@@ -119,7 +95,7 @@ describe('snap', () => {
 
     it('should detect deleted files', () => {
       const filePath = writeFile(collectionDir, 'request.bru', 'content');
-      snap.init(collectionDir, snapFilePath);
+      snap.add(collectionDir, snapFilePath);
 
       fs.unlinkSync(filePath);
 
@@ -139,11 +115,32 @@ describe('snap', () => {
       expect(result.deleted).toHaveLength(0);
     });
 
+    it('should ignore node_modules and .git by default', () => {
+      writeFile(collectionDir, 'request.bru', 'content');
+      writeFile(collectionDir, 'node_modules/pkg/index.js', 'module');
+      writeFile(collectionDir, '.git/config', 'gitconfig');
+      snap.init(snapFilePath);
+
+      const result = snap.status(collectionDir, snapFilePath);
+      expect(result.added).toHaveLength(1);
+      expect(result.added[0]).toContain('request.bru');
+    });
+
+    it('should respect custom ignores', () => {
+      writeFile(collectionDir, 'request.bru', 'content');
+      writeFile(collectionDir, 'temp/draft.bru', 'draft');
+      snap.init(snapFilePath);
+
+      const result = snap.status(collectionDir, snapFilePath, ['temp']);
+      expect(result.added).toHaveLength(1);
+      expect(result.added[0]).toContain('request.bru');
+    });
+
     it('should detect mixed changes', (done) => {
       writeFile(collectionDir, 'keep.bru', 'keep');
       const modifyPath = writeFile(collectionDir, 'modify.bru', 'original');
       writeFile(collectionDir, 'delete.bru', 'to delete');
-      snap.init(collectionDir, snapFilePath);
+      snap.add(collectionDir, snapFilePath);
 
       setTimeout(() => {
         writeFile(collectionDir, 'added.bru', 'new');
@@ -160,18 +157,27 @@ describe('snap', () => {
   });
 
   describe('add', () => {
-    it('should update snap.json with current state', () => {
+    it('should persist snapshot so status shows no changes', () => {
       writeFile(collectionDir, 'request.bru', 'content');
-      snap.init(collectionDir, snapFilePath);
-
-      writeFile(collectionDir, 'new.bru', 'new');
       snap.add(collectionDir, snapFilePath);
 
-      // After add, status should show no changes
       const result = snap.status(collectionDir, snapFilePath);
       expect(result.added).toHaveLength(0);
       expect(result.modified).toHaveLength(0);
       expect(result.deleted).toHaveLength(0);
+    });
+
+    it('should write snap.json with file entries', () => {
+      writeFile(collectionDir, 'request.bru', 'content');
+      snap.add(collectionDir, snapFilePath);
+
+      expect(fs.existsSync(snapFilePath)).toBe(true);
+      const written = JSON.parse(fs.readFileSync(snapFilePath, 'utf-8'));
+      expect(Object.keys(written)).toHaveLength(1);
+
+      const entry = Object.values(written)[0] as any;
+      expect(entry).toHaveProperty('mtime');
+      expect(entry).toHaveProperty('hash');
     });
   });
 });

@@ -1,6 +1,6 @@
 export interface FileEntry {
   mtime: number;
-  size: number;
+  hash: string;
 }
 
 export interface Snapshot {

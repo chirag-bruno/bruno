@@ -71,6 +71,7 @@ const { getProcessEnvVars } = require('../store/process-env');
 const { getOAuth2TokenUsingAuthorizationCode, getOAuth2TokenUsingClientCredentials, getOAuth2TokenUsingPasswordCredentials, getOAuth2TokenUsingImplicitGrant, refreshOauth2Token } = require('../utils/oauth2');
 const { getCertsAndProxyConfig } = require('./network/cert-utils');
 const collectionWatcher = require('../app/collection-watcher');
+const { snap } = require('@usebruno/snap');
 const { transformBrunoConfigBeforeSave } = require('../utils/transformBrunoConfig');
 const { REQUEST_TYPES } = require('../utils/constants');
 const { cancelOAuth2AuthorizationRequest, isOauth2AuthorizationRequestInProgress } = require('../utils/oauth2-protocol-handler');
@@ -80,6 +81,11 @@ const { saveSpecAndUpdateMetadata, cleanupSpecFilesForCollection } = require('./
 const environmentSecretsStore = new EnvironmentSecretsStore();
 const collectionSecurityStore = new CollectionSecurityStore();
 const uiStateSnapshotStore = new UiStateSnapshotStore();
+
+// Get the snap.json file path for a collection
+const getSnapFilePath = (collectionUid) => {
+  return path.join(app.getPath('userData'), 'snap', collectionUid, 'snap.json');
+};
 
 // size and file count limits to determine whether the bru files in the collection should be loaded asynchronously or not.
 const MAX_COLLECTION_SIZE_IN_MB = 20;
@@ -1981,6 +1987,23 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
     } catch (error) {
       throw error;
     }
+
+    // Snap: determine what changed since last mount
+    const snapFilePath = getSnapFilePath(collectionUid);
+    const ignores = brunoConfig?.ignore || [];
+    const hasExistingSnap = fs.existsSync(snapFilePath);
+
+    if (!hasExistingSnap) {
+      snap.init(snapFilePath);
+    }
+
+    const snapStartTime = performance.now();
+    const snapStatus = snap.status(collectionPathname, snapFilePath, ignores);
+    const snapDuration = performance.now() - snapStartTime;
+    console.log(`[snap] status for collection: ${collectionUid} (${snapDuration.toFixed(2)}ms)`, snapStatus);
+    // Save the current snapshot
+    // snap.add(collectionPathname, snapFilePath, ignores);
+
     const {
       size,
       filesCount,
@@ -1992,7 +2015,7 @@ const registerRendererEventHandlers = (mainWindow, watcher) => {
         || (filesCount > MAX_COLLECTION_FILES_COUNT)
         || (maxFileSize > MAX_SINGLE_FILE_SIZE_IN_COLLECTION_IN_MB);
 
-    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, shouldLoadCollectionAsync);
+    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, shouldLoadCollectionAsync, snapStatus);
 
     // Add watcher for transient directory
     watcher.addTempDirectoryWatcher(mainWindow, tempDirectoryPath, collectionUid, collectionPathname);
