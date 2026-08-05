@@ -30,7 +30,8 @@ const mainLintFiles = [
   'packages/bruno-requests/**/*.ts',
   'packages/bruno-requests/**/*.js',
   'packages/bruno-tests/**/*.{js,ts}',
-  'packages/bruno-sqlite/**/*.{js,ts}'
+  'packages/bruno-sqlite/**/*.{js,ts}',
+  'packages/bruno-sandbox/**/*.{js,ts}'
 ];
 
 module.exports = runESMImports().then(() => defineConfig([
